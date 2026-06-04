@@ -1,0 +1,112 @@
+Query,Page,Clicks,Impressions,CTR,Position
+email marketing 0,https://example.com/compare/email-marketing-0,29,261,0.1111,7.7
+web hosting,https://example.com/blog/web-hosting-2,80,2560,0.0312,26.1
+email marketing 4,https://example.com/products/email-marketing-4,41,984,0.0417,17.3
+tax filing,https://example.com/guides/tax-filing-7,68,884,0.0769,8.0
+meal prep 8,https://example.com/guides/meal-prep-8-2023,1833,56823,0.0323,20.5
+vpn,https://example.com/blog/vpn-9-2023,1,39,0.0256,7.9
+web hosting 12,https://example.com/guides/web-hosting-12,1186,13046,0.0909,9.6
+meal prep 13,https://example.com/resources/meal-prep-13-2023,332,4980,0.0667,7.8
+vpn,https://example.com/news/vpn-14-2023,27,324,0.0833,22.8
+yoga 17,https://example.com/blog/yoga-17,21,357,0.0588,25.2
+home office 18,https://example.com/guides/home-office-18,53,1537,0.0345,22.4
+meal prep 19,https://example.com/help/meal-prep-19,1350,33750,0.04,26.1
+email marketing,https://example.com/blog/email-marketing-20,5,100,0.05,4.4
+email marketing 21,https://example.com/news/email-marketing-21,16,512,0.0312,13.2
+running shoes 22,https://example.com/help/running-shoes-22,75,1350,0.0556,27.1
+meal prep 27,https://example.com/resources/meal-prep-27-2024,2492,67284,0.037,28.3
+home office 28,https://example.com/news/home-office-28,50,1650,0.0303,16.5
+yoga 30,https://example.com/blog/yoga-30,227,4767,0.0476,20.4
+tax filing,https://example.com/help/tax-filing-31,40,920,0.0435,25.1
+running shoes 32,https://example.com/help/running-shoes-32,48,1776,0.027,11.5
+home office,https://example.com/blog/home-office-37,39,1521,0.0256,28.4
+credit cards 41,https://example.com/guides/credit-cards-41-2023,55,1430,0.0385,9.9
+meal prep 43,https://example.com/compare/meal-prep-43,2700,78300,0.0345,25.9
+meal prep 44,https://example.com/blog/meal-prep-44,1755,68445,0.0256,16.0
+solar panels 47,https://example.com/help/solar-panels-47,39,1248,0.0312,23.1
+running shoes 51,https://example.com/products/running-shoes-51,19,437,0.0435,26.3
+home office,https://example.com/compare/home-office-54-2023,2888,46208,0.0625,11.6
+solar panels 55,https://example.com/guides/solar-panels-55,1152,25344,0.0455,3.2
+web hosting 56,https://example.com/blog/web-hosting-56,59,1652,0.0357,14.7
+solar panels,https://example.com/compare/solar-panels-62,2061,35037,0.0588,10.3
+email marketing 64,https://example.com/news/email-marketing-64,1633,50623,0.0323,22.6
+email marketing 65,https://example.com/products/email-marketing-65-2024,310,6820,0.0455,20.0
+web hosting 66,https://example.com/guides/web-hosting-66-2023,79,2133,0.037,21.4
+web hosting 71,https://example.com/blog/web-hosting-71,1984,25792,0.0769,12.6
+email marketing,https://example.com/resources/email-marketing-72-2023,2743,32916,0.0833,23.0
+yoga 74,https://example.com/blog/yoga-74,79,1580,0.05,17.6
+yoga 75,https://example.com/blog/yoga-75,6,204,0.0294,9.2
+yoga,https://example.com/blog/yoga-76,37,1221,0.0303,10.0
+credit cards 78,https://example.com/blog/credit-cards-78,68,1224,0.0556,21.1
+credit cards 79,https://example.com/resources/credit-cards-79-2024,2021,64672,0.0312,9.2
+email marketing 83,https://example.com/blog/email-marketing-83-2024,81,1053,0.0769,13.1
+home office,https://example.com/help/home-office-86,1731,50199,0.0345,23.6
+tax filing 87,https://example.com/products/tax-filing-87-2024,1192,33376,0.0357,4.0
+meal prep 88,https://example.com/compare/meal-prep-88,2618,104720,0.025,12.8
+tax filing 91,https://example.com/blog/tax-filing-91,459,8262,0.0556,26.8
+home office 92,https://example.com/blog/home-office-92,4,108,0.037,3.5
+solar panels 100,https://example.com/resources/solar-panels-100,10,330,0.0303,29.3
+home office,https://example.com/resources/home-office-103,68,1360,0.05,21.3
+tax filing 109,https://example.com/news/tax-filing-109,863,22438,0.0385,29.5
+credit cards 110,https://example.com/news/credit-cards-110,21,693,0.0303,6.6
+solar panels,https://example.com/help/solar-panels-113,77,3080,0.025,16.9
+email marketing 115,https://example.com/resources/email-marketing-115,2316,78744,0.0294,23.2
+solar panels 116,https://example.com/blog/solar-panels-116,831,30747,0.027,29.4
+yoga 117,https://example.com/news/yoga-117,231,2310,0.1,3.9
+solar panels,https://example.com/guides/solar-panels-118,2163,60564,0.0357,23.4
+home office 120,https://example.com/guides/home-office-120,60,780,0.0769,10.6
+web hosting 121,https://example.com/products/web-hosting-121-2023,25,500,0.05,1.4
+home office 122,https://example.com/news/home-office-122-2023,49,1862,0.0263,24.3
+solar panels,https://example.com/blog/solar-panels-126,2157,49611,0.0435,16.2
+web hosting,https://example.com/products/web-hosting-127-2024,29,1102,0.0263,11.9
+email marketing,https://example.com/help/email-marketing-128-2023,2935,29350,0.1,17.3
+web hosting 129,https://example.com/help/web-hosting-129,2421,31473,0.0769,5.1
+vpn 136,https://example.com/blog/vpn-136,24,288,0.0833,25.1
+home office 138,https://example.com/help/home-office-138,2406,96240,0.025,8.5
+home office 140,https://example.com/help/home-office-140-2023,13,182,0.0714,10.9
+yoga 143,https://example.com/blog/yoga-143,23,437,0.0526,9.9
+web hosting 144,https://example.com/resources/web-hosting-144-2024,2940,32340,0.0909,25.4
+solar panels,https://example.com/resources/solar-panels-146,70,1610,0.0435,4.0
+home office 147,https://example.com/help/home-office-147,1536,16896,0.0909,24.6
+yoga 150,https://example.com/compare/yoga-150,1859,72501,0.0256,4.8
+email marketing 151,https://example.com/blog/email-marketing-151,928,28768,0.0323,8.3
+home office 154,https://example.com/products/home-office-154,1912,66920,0.0286,11.2
+vpn 155,https://example.com/resources/vpn-155-2023,209,2299,0.0909,9.6
+home office,https://example.com/products/home-office-157,65,1105,0.0588,16.6
+yoga 162,https://example.com/compare/yoga-162,48,1776,0.027,3.0
+yoga 164,https://example.com/resources/yoga-164,1641,27897,0.0588,2.7
+yoga,https://example.com/compare/yoga-165-2024,75,1950,0.0385,4.8
+email marketing 167,https://example.com/help/email-marketing-167,39,1170,0.0333,8.2
+solar panels 172,https://example.com/resources/solar-panels-172,4,88,0.0455,23.2
+meal prep,https://example.com/help/meal-prep-176,89,1424,0.0625,21.0
+vpn 177,https://example.com/guides/vpn-177,29,377,0.0769,10.3
+home office 184,https://example.com/resources/home-office-184-2024,5,95,0.0526,23.0
+web hosting,https://example.com/resources/web-hosting-186,73,2482,0.0294,26.5
+meal prep,https://example.com/help/meal-prep-188,1330,47880,0.0278,3.6
+tax filing,https://example.com/help/tax-filing-189,52,1924,0.027,8.2
+running shoes 193,https://example.com/blog/running-shoes-193-2023,72,2016,0.0357,9.0
+vpn 194,https://example.com/help/vpn-194-2024,18,360,0.05,17.9
+running shoes 197,https://example.com/news/running-shoes-197,1776,33744,0.0526,19.3
+meal prep,https://example.com/products/meal-prep-200-2023,2913,96129,0.0303,27.6
+tax filing,https://example.com/resources/tax-filing-201,1636,14724,0.1111,20.2
+email marketing 203,https://example.com/products/email-marketing-203,1177,24717,0.0476,15.4
+vpn 204,https://example.com/help/vpn-204-2024,66,1254,0.0526,2.5
+email marketing 205,https://example.com/compare/email-marketing-205,2,62,0.0323,22.3
+meal prep 210,https://example.com/blog/meal-prep-210,5,185,0.027,17.3
+web hosting 212,https://example.com/guides/web-hosting-212,594,8910,0.0667,13.0
+vpn,https://example.com/news/vpn-216-2023,54,918,0.0588,1.7
+home office,https://example.com/guides/home-office-219,865,20760,0.0417,4.8
+tax filing 227,https://example.com/compare/tax-filing-227,1628,53724,0.0303,17.6
+vpn 229,https://example.com/guides/vpn-229-2024,17,459,0.037,10.5
+solar panels 232,https://example.com/blog/solar-panels-232,61,793,0.0769,15.5
+solar panels,https://example.com/help/solar-panels-233,73,876,0.0833,15.1
+home office 236,https://example.com/products/home-office-236,78,1404,0.0556,14.9
+meal prep 238,https://example.com/guides/meal-prep-238-2023,998,28942,0.0345,8.7
+running shoes 239,https://example.com/blog/running-shoes-239,1819,72760,0.025,23.7
+running shoes 240,https://example.com/help/running-shoes-240-2024,6,84,0.0714,22.5
+solar panels 241,https://example.com/resources/solar-panels-241-2024,1,35,0.0286,4.1
+vpn 242,https://example.com/products/vpn-242,27,810,0.0333,29.7
+tax filing,https://example.com/news/tax-filing-243,44,1540,0.0286,14.7
+home office 245,https://example.com/resources/home-office-245-2023,47,940,0.05,12.8
+yoga 246,https://example.com/resources/yoga-246,2583,30996,0.0833,4.1
+vpn,https://example.com/help/vpn-247,73,1752,0.0417,15.0

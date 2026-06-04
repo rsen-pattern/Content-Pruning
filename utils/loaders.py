@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+import numpy as np
 import pandas as pd
 
 
@@ -188,7 +189,7 @@ def load_gsc(file: Any, filename: str = "") -> LoadResult:
         if f"_{canon}" not in df:
             df[f"_{canon}"] = 0.0
     # CTR may be a fraction or a percent; normalise to fraction.
-    if df["_ctr"].max() is not None and df["_ctr"].max() > 1.5:
+    if df["_ctr"].notna().any() and df["_ctr"].max() > 1.5:
         df["_ctr"] = df["_ctr"] / 100.0
 
     top_query: dict[str, Optional[str]] = {}
@@ -248,7 +249,7 @@ def load_ga4(file: Any, filename: str = "") -> LoadResult:
         warnings.append("[GA4] missing 'sessions' — defaulted to 0")
     else:
         found["sessions"] = sessions_col
-    df["_eng"] = _to_num(df[eng_col]) if eng_col else pd.NA
+    df["_eng"] = _to_num(df[eng_col]) if eng_col else np.nan
     df["_conv"] = _to_num(df[conv_col]) if conv_col else 0.0
     df["_rev"] = _to_num(df[rev_col]) if rev_col else 0.0
     for canon, col in (("engagement_rate", eng_col), ("conversions", conv_col), ("revenue", rev_col)):
@@ -257,7 +258,8 @@ def load_ga4(file: Any, filename: str = "") -> LoadResult:
         else:
             found[canon] = col
 
-    if df["_eng"].dropna().max() is not None and df["_eng"].dropna().max() and df["_eng"].dropna().max() > 1.5:
+    # Engagement rate may be a fraction or a percent; normalise to fraction.
+    if eng_col is not None and df["_eng"].notna().any() and df["_eng"].max() > 1.5:
         df["_eng"] = df["_eng"] / 100.0
 
     # Split organic vs non-organic if a channel column exists.

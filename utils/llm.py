@@ -18,14 +18,25 @@ import json
 import re
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
+from urllib.robotparser import RobotFileParser
 
 import pandas as pd
 
 from utils.bifrost import call_with_fallback, estimate_chars_as_tokens, estimate_cost_usd
 from utils.prompts import load_prompt, render
+from utils.router import ACTIONS, AMBIGUOUS
 
 _REFERENCES_DIR = Path(__file__).resolve().parent.parent / "references"
 _SYSTEM = "You are a precise SEO analyst. Follow the output format exactly and return only what is asked."
+USER_AGENT = "ContentAuditEngine/1.0 (+https://pattern.com; SEO content audit bot)"
+_VALID_ACTIONS = set(ACTIONS)
+
+
+def normalize_action(raw: object) -> str:
+    """Map a model's free-form action to a known action; unknown -> AMBIGUOUS."""
+    act = str(raw or "").strip().lower().replace("-", "_").replace(" ", "_")
+    return act if act in _VALID_ACTIONS else AMBIGUOUS
 
 
 # --------------------------------------------------------------------------- #
@@ -72,15 +83,51 @@ def _extract_json(text: str):
 # --------------------------------------------------------------------------- #
 # Content fetch                                                                #
 # --------------------------------------------------------------------------- #
+_robots_cache: dict[str, Optional[RobotFileParser]] = {}
+
+
+def _robots_allows(url: str, timeout: int = 5) -> bool:
+    """Check robots.txt for the URL's host (cached per host). Allows on error
+    so a missing/unreachable robots.txt doesn't block the audit."""
+    try:
+        import requests
+    except Exception:
+        return True
+    parts = urlsplit(url)
+    host = (parts.scheme or "https", parts.netloc)
+    key = f"{host[0]}://{host[1]}"
+    if key not in _robots_cache:
+        rp = RobotFileParser()
+        try:
+            robots_url = urlunsplit((host[0], host[1], "/robots.txt", "", ""))
+            r = requests.get(robots_url, timeout=timeout, headers={"User-Agent": USER_AGENT})
+            if r.status_code >= 400:
+                _robots_cache[key] = None  # no robots => allow all
+            else:
+                rp.parse(r.text.splitlines())
+                _robots_cache[key] = rp
+        except Exception:
+            _robots_cache[key] = None
+    rp = _robots_cache[key]
+    if rp is None:
+        return True
+    try:
+        return rp.can_fetch(USER_AGENT, url)
+    except Exception:
+        return True
+
+
 def fetch_excerpt(url: str, max_chars: int = 3000, timeout: int = 10) -> str:
-    """Best-effort visible-text excerpt for a URL. Never raises."""
+    """Best-effort visible-text excerpt for a URL. Respects robots.txt. Never raises."""
     try:
         import requests
         from bs4 import BeautifulSoup
     except Exception:
         return ""
+    if not _robots_allows(url):
+        return ""
     try:
-        resp = requests.get(url, timeout=timeout, headers={"User-Agent": "ContentAuditEngine/1.0"})
+        resp = requests.get(url, timeout=timeout, headers={"User-Agent": USER_AGENT})
         if resp.status_code >= 400 or "html" not in resp.headers.get("content-type", "html"):
             return ""
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -167,7 +214,9 @@ def estimate_ambiguous_cost(df: pd.DataFrame, model: str, batch_size: int,
     calls = (n + batch_size - 1) // batch_size
     template = load_prompt("ambiguous_judgment")
     guides_tok = estimate_chars_as_tokens(guides_context + template)
-    per_url_tok = estimate_chars_as_tokens("x" * 1800)  # signals + ~1500 char excerpt
+    # Signals (~300 chars) + an excerpt only when fetching (~1500 chars).
+    per_url_chars = 300 + (1500 if fetch else 15)
+    per_url_tok = estimate_chars_as_tokens("x" * per_url_chars)
     input_tokens = calls * guides_tok + n * per_url_tok
     output_tokens = n * 120  # ~one short JSON object per URL
     usd = estimate_cost_usd(model, input_tokens, output_tokens)
@@ -190,7 +239,7 @@ def judge_ambiguous(client, model, df: pd.DataFrame, guides_context: str,
             for item in parsed:
                 if isinstance(item, dict) and item.get("url"):
                     out[str(item["url"])] = {
-                        "action": str(item.get("action", "keep")),
+                        "action": normalize_action(item.get("action")),
                         "rationale": str(item.get("rationale", "")),
                         "confidence": float(item.get("confidence", 0.0) or 0.0),
                     }

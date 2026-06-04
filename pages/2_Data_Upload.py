@@ -1,9 +1,18 @@
 """Data Upload — parse the four exports with graceful degradation."""
+import io
+
 import streamlit as st
 
 from utils import loaders
 from utils.signals import suggest_detections
 from utils.ui import bifrost_sidebar, init_state
+
+
+@st.cache_data(show_spinner=False)
+def _cached_load(_loader, data: bytes, filename: str):
+    """Parse cached by file content + name, so reruns don't re-parse big CSVs.
+    `_loader` is underscore-prefixed so Streamlit skips hashing the function."""
+    return _loader(io.BytesIO(data), filename)
 
 st.set_page_config(page_title="Data Upload", page_icon="📤", layout="wide")
 init_state()
@@ -29,14 +38,15 @@ for title, (key, fn, sample_path) in LOADERS.items():
     res = None
     if use_samples:
         try:
-            res = fn(open(sample_path, "rb"), sample_path)
+            with open(sample_path, "rb") as fh:
+                res = _cached_load(fn, fh.read(), sample_path)
         except Exception as exc:  # noqa: BLE001
             st.error(f"Sample load failed: {exc}")
     else:
         up = st.file_uploader(f"{title} export (CSV/XLSX)", type=["csv", "xlsx", "xls"], key=f"up_{key}")
         if up is not None:
             try:
-                res = fn(up, up.name)
+                res = _cached_load(fn, up.getvalue(), up.name)
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Could not parse: {exc}")
     if res is not None:
