@@ -1,0 +1,21 @@
+You are an SEO content strategist. The page below is a candidate to be
+repurposed (its current format is underperforming). Suggest 2-3 format changes.
+
+Each suggestion should name a concrete format move, e.g.:
+- "Split into N focused articles: A, B, C"
+- "Consolidate into the pillar page X and 301 this URL"
+- "Turn the step-by-step section into a short video / infographic"
+- "Convert the comparison into an interactive table"
+
+Do not invent facts about the page beyond the signals and excerpt provided.
+
+Page: {url}
+Title: {title}
+Top query: {top_query}
+Signals: {signals}
+
+Content excerpt:
+{content_excerpt}
+
+Return ONLY a JSON array of suggestion strings, no prose:
+["suggestion 1", "suggestion 2", ...]

@@ -1,0 +1,9 @@
+Page path,Default channel group,Sessions,Engagement rate,Conversions,Total revenue
+https://example.com/strong-guide,Organic Search,9000,0.71,120,15000
+https://example.com/stale-earner,Organic Search,5200,0.66,40,4800
+https://example.com/sweet-spot,Organic Search,1100,0.55,5,300
+https://example.com/email-lander,Email,1800,0.62,30,2600
+https://example.com/email-lander,Organic Search,0,0.0,0,0
+https://example.com/linked-deadweight,Direct,40,0.30,0,0
+https://example.com/whitepaper.pdf,Referral,600,0.80,10,1200
+https://example.com/ambiguous-page,Organic Social,20,0.45,1,80
