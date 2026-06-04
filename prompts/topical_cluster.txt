@@ -1,0 +1,15 @@
+You are an SEO information architect. Group the pages below into topical clusters
+so that pages competing for the same topic share a cluster label.
+
+Rules:
+- A cluster label is a short, human-readable topic (2-4 words), e.g. "running shoes",
+  "email marketing basics", "tax filing deadlines".
+- Pages about the same thing MUST get the identical label (case-sensitive) so
+  cannibalisation can be detected.
+- Do not invent information. Base clusters only on the URL, title, H1, and queries given.
+
+Return ONLY a JSON object mapping each url to its cluster label, no prose:
+{{"https://...": "cluster label", ...}}
+
+Pages:
+{pages_block}

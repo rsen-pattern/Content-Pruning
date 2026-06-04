@@ -1,1 +1,82 @@
-# Content-Pruning
+# Content Audit Engine
+
+A Streamlit app for SEO content auditing. It takes a website's URL inventory plus
+performance, link and crawl data and produces a per-URL recommendation across
+**8 actions** — keep · refresh · repurpose · consolidate · schedule-update ·
+noindex · delete-301 · delete-410 — plus the deliverables a content team needs to
+execute them.
+
+A Pattern tool, mirroring the conventions of `rsen-pattern/SEO-Forecast`:
+deterministic-first routing, an assumptions panel with `defaulted / detected /
+overridden` provenance, a snapshot-JSON-per-run comparison pattern, and all LLM
+calls through **Bi Frost** (`call_with_fallback`, models from `config/models.json`).
+
+## Quickstart
+
+```bash
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
+
+Then, in the app:
+
+1. **Data Upload** — drop in Screaming Frog / GSC / GA4 / Ahrefs exports (any
+   subset; toggle "Use bundled sample exports" to try it immediately).
+2. **Configuration** — pick a scenario, tune thresholds, choose models.
+3. **Audit** — run the deterministic router; optionally enrich with Bi Frost.
+4. **Consolidation Planner / Refresh Suggestions** — review and generate suggestions.
+5. **Deliverables** — download the 7 outputs.
+
+### Bi Frost key
+
+Set `BIFROST_API_KEY` (or `BIFROST_KEY`) as an env var or in
+`.streamlit/secrets.toml`, or paste it in the sidebar. Without a key the
+deterministic audit still runs fully — only the LLM steps are disabled.
+
+## Deliverables
+
+1. Decision Spreadsheet (XLSX, with editable `manual_override` column)
+2. Redirect Map (CSV: `source_url, destination_url, status_code`)
+3. Refresh Queue (XLSX, ROI-ranked, with LLM update suggestions)
+4. Consolidation Plan (XLSX: clusters, winners, redirects, merge notes)
+5. Repurpose Backlog (XLSX)
+6. Snapshot JSON (for next audit's comparison)
+7. Executive Summary (Markdown)
+
+## Layout
+
+```
+streamlit_app.py        # home / overview
+pages/                  # 1 Methodology … 7 Deliverables
+config/models.json      # Bi Frost model catalogue + fallback chain
+prompts/*.txt           # the 5 LLM prompts (data, not inline strings)
+utils/
+  bifrost.py            # Bi Frost client + call_with_fallback + cost helpers
+  prompts.py            # prompt loader
+  loaders.py            # parse the 4 exports (graceful degradation)
+  signals.py            # per-URL signal computation (pure)
+  router.py             # the deterministic rules engine (pure)
+  llm.py                # the 5 Bi Frost call sites + content fetch + cost pre-flight
+  exporters.py          # build the 7 deliverables
+  ctr_curves.py         # industry CTR-by-position baseline
+  config.py             # defaults, scenarios, provenance
+  ui.py                 # shared Streamlit helpers
+references/             # the 7 source guides (NOT yet present — see methodology.md)
+samples/                # sample exports for first-run testing
+tests/test_pipeline.py  # end-to-end loaders→signals→router check
+```
+
+## Status & caveats
+
+- **Reference guides not yet included.** `references/` is empty, so LLM-judgment
+  rationale and the executive-summary timeline citations are **unverified against
+  the source literature**. See `methodology.md`.
+- Router order **deviates from the original spec in 5 documented ways**
+  (see `methodology.md` → "Router deviations").
+- The tool **recommends**; it does not edit pages or deploy redirects.
+
+## Tests
+
+```bash
+python -m tests.test_pipeline
+```

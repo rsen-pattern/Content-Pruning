@@ -1,0 +1,9 @@
+Query,Page,Clicks,Impressions,CTR,Position
+the complete guide,https://example.com/strong-guide,500,8000,0.0625,3.1
+older earner,https://example.com/stale-earner,300,6000,0.05,4.2
+best tools,https://example.com/best-tools-2024,40,900,0.044,5.0
+sweet spot keyword,https://example.com/sweet-spot,30,800,0.0375,12.4
+low ctr keyword,https://example.com/low-ctr,10,2000,0.005,4.0
+widget reviews,https://example.com/cannibal-a,20,1500,0.0133,9.1
+widget reviews,https://example.com/cannibal-b,15,1200,0.0125,11.3
+ambiguous keyword,https://example.com/ambiguous-page,0,50,0.0,30.0

@@ -1,0 +1,15 @@
+Address,Status Code,Indexability,Word Count,Unique Inlinks,Last Modified,Title 1,H1-1,Content Type
+https://example.com/strong-guide,200,Indexable,1800,42,2025-09-01,The Complete Guide,The Complete Guide,text/html; charset=UTF-8
+https://example.com/stale-earner,200,Indexable,1500,30,2023-01-15,Older Earner,Older Earner,text/html; charset=UTF-8
+https://example.com/best-tools-2024,200,Indexable,1200,12,2024-02-01,Best Tools 2024,Best Tools 2024,text/html; charset=UTF-8
+https://example.com/sweet-spot,200,Indexable,900,8,2025-03-01,Sweet Spot Page,Sweet Spot Page,text/html; charset=UTF-8
+https://example.com/low-ctr,200,Indexable,1100,15,2025-04-01,Low CTR Page,Low CTR Page,text/html; charset=UTF-8
+https://example.com/cannibal-a,200,Indexable,800,5,2025-02-01,Widget Reviews A,Widget Reviews,text/html; charset=UTF-8
+https://example.com/cannibal-b,200,Indexable,700,3,2025-02-01,Widget Reviews B,Widget Reviews,text/html; charset=UTF-8
+https://example.com/linked-deadweight,200,Indexable,600,2,2022-01-01,Old Linked Page,Old Linked Page,text/html; charset=UTF-8
+https://example.com/email-lander,200,Indexable,400,1,2024-06-01,Newsletter Lander,Newsletter Lander,text/html; charset=UTF-8
+https://example.com/thin-orphan,200,Indexable,90,0,2025-01-01,Thin Page,Thin Page,text/html; charset=UTF-8
+https://example.com/ancient-junk,200,Indexable,300,0,2021-01-01,Ancient Junk,Ancient Junk,text/html; charset=UTF-8
+https://example.com/noindexed-thing,200,Non-Indexable,500,3,2024-01-01,Noindexed Thing,Noindexed Thing,text/html; charset=UTF-8
+https://example.com/whitepaper.pdf,200,Indexable,0,4,2023-05-01,,,application/pdf
+https://example.com/ambiguous-page,200,Indexable,700,4,2024-08-01,Ambiguous Page,Ambiguous Page,text/html; charset=UTF-8
