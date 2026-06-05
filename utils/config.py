@@ -30,6 +30,7 @@ DEFAULTS: dict[str, Any] = {
     "ctr_min_impressions": 500,       # NEW: floor so low-impression noise is not flagged
     "non_organic_threshold": 50,
     "delete_410_age_days": 730,
+    "min_maturity_days": 90,          # don't prune pages younger than this (need time to perform)
     "thin_word_count": 250,           # NEW: thin-page catch
     "llm_judgment_for": "ambiguous_only",  # ambiguous_only | all | none
     "batch_model": "anthropic/claude-haiku-4-5",

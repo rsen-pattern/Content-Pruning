@@ -82,12 +82,12 @@ def parse_judgment_items(parsed) -> dict[str, dict]:
 # Reference guides (judgment context)                                          #
 # --------------------------------------------------------------------------- #
 def load_guides() -> str:
-    """Concatenate references/*.md as judgment context.
+    """Concatenate the reference guides as judgment context.
 
-    The 7 source guides are not yet in the repo; until they are, this returns a
-    short stub and the ambiguous-judgment rationale is UNVERIFIED against the
-    literature (flagged in methodology.md)."""
-    mds = sorted(_REFERENCES_DIR.glob("*.md"))
+    Excludes README.md (it's folder documentation, not a source guide). When no
+    guides are present, returns a stub and the judgment rationale is flagged
+    UNVERIFIED against the literature."""
+    mds = sorted(p for p in _REFERENCES_DIR.glob("*.md") if p.stem.lower() != "readme")
     if not mds:
         return ("(No reference guides are loaded. Apply general SEO content-audit "
                 "best practice and be conservative about deletion.)")

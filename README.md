@@ -84,11 +84,12 @@ tests/test_pipeline.py  # end-to-end loaders→signals→router check
 
 ## Status & caveats
 
-- **Reference guides not yet included.** `references/` is empty, so LLM-judgment
-  rationale and the executive-summary timeline citations are **unverified against
-  the source literature**. See `methodology.md`.
-- Router order **deviates from the original spec in 5 documented ways**
-  (see `methodology.md` → "Router deviations").
+- **Reference guides loaded.** The 7 source guides are in `references/`; the
+  router's rules have been verified against them and the LLM judgment context is
+  grounded in them (see `methodology.md` → "Verification against the references").
+- Router order **deviates from the original spec in 7 documented ways**
+  (5 original + a literature-driven maturity guard and a 301-over-410 preference;
+  see `methodology.md` → "Router deviations").
 - The tool **recommends**; it does not edit pages or deploy redirects.
 
 ## Tests

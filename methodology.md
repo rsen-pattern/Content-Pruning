@@ -4,11 +4,30 @@ The Content Audit Engine routes every URL to one of eight actions. Most URLs
 route **deterministically**; Bi Frost (Pattern's LLM gateway) is reserved for
 genuinely ambiguous URLs and for generating human-facing suggestions.
 
-> ⚠️ **Verification status.** The 7 source reference guides were **not present**
-> when this engine was built. The rule thresholds and the ambiguous-judgment
-> context are therefore based on the build spec and general SEO best practice,
-> **not yet verified against the source literature**. Drop the guides into
-> `references/*.md` and re-review before treating the rationale as authoritative.
+## Verification against the references
+
+The router's rules and thresholds have been checked against the 7 source guides
+in `references/`. The literature **corroborates** the design:
+
+- **`keep_threshold = 100`** — AIOSEO: "fewer than 100 clicks over a full year
+  are worth reviewing… but don't auto-delete based on clicks alone." The router
+  only ever deletes at *zero* clicks plus no links, never on low clicks.
+- **Sweet-spot refresh (pos 8–20)** — AIOSEO puts the highest-ROI band at 8–15;
+  high-impressions/low-CTR pages are refresh, not removal, candidates.
+- **301 vs 410** — AIOSEO is explicit: 301 to the closest match, and "if no
+  closely related page exists, use a 410." The router 301s when equity/relevance
+  exists and 410s only otherwise (and now prefers a 301 when a topical match is
+  available — see deviation 6).
+- **Preserve link equity, 2-year delete age, year-in-URL → schedule,
+  cannibalisation → consolidate (winner = most traffic + backlinks), noindex for
+  reader-useful/SEO-useless pages, PDF→HTML canonicalisation, batch + priority
+  rollout, decision logging, orphan internal-linking, conversion/non-organic
+  protection** — all explicitly supported across the Kondo / Ahrefs / Conductor /
+  Clearscope / AIOSEO guides.
+
+The guides load into the ambiguous-judgment prompt automatically
+(`utils/llm.py::load_guides()`), so LLM rationale is now grounded in this
+literature rather than generic best practice.
 
 ## Signals computed per URL
 
@@ -64,6 +83,14 @@ These five intentional changes were approved before implementation:
    `NO_ACTION` (or `DELETE_301` when equity exists) rather than the valuable `KEEP`.
 5. **Thin-page catch** (step 12) routes thin, link-less, click-less pages
    deterministically to `NOINDEX` instead of escalating thousands of them to the LLM.
+6. **Maturity guard** (literature-driven, added after reading the references): a
+   would-be deletion/noindex on a page changed within `min_maturity_days` (default
+   90) is escalated to `AMBIGUOUS` instead — four guides warn against pruning
+   pages that haven't had time to perform. Uses `last_modified` as a proxy; if
+   it's unknown the guard doesn't fire.
+7. **301-over-410 preference** — a hard-delete (410) is upgraded to a 301 when a
+   strong same-cluster keeper exists (AIOSEO: prefer a redirect to a close match;
+   410 only when there's no logical target). Requires topical clusters.
 
 ## Safety & data-availability (Layer A)
 
