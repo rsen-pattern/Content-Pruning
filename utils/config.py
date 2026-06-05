@@ -39,6 +39,11 @@ DEFAULTS: dict[str, Any] = {
     "protect_conversions": True,      # never auto-delete a converting / revenue page
     "protect_conversions_floor": 1,   # conversions >= this => protected
     "protect_revenue_floor": 1.0,     # revenue >= this => protected
+    # Layer B — intent modulates how fast content is considered stale (multiplier
+    # on stale_threshold_days). Transactional/commercial decay faster.
+    "intent_stale_factors": {"transactional": 0.5, "commercial": 0.7,
+                             "informational": 1.0, "navigational": 1.5},
+    "trend_decline_pct": -0.2,        # clicks change <= this (e.g. -20%) => declining
     "ambiguous_batch_size": 5,
     "max_llm_cost_usd": 5.0,          # hard pre-flight cap
 }

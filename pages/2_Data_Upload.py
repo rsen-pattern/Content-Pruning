@@ -1,6 +1,7 @@
 """Data Upload — parse the four exports with graceful degradation."""
 import io
 
+import pandas as pd
 import streamlit as st
 
 from utils import loaders
@@ -57,10 +58,22 @@ for title, (key, fn, sample_path) in LOADERS.items():
         for w in res.warnings:
             st.warning(w)
 
+st.subheader("Optional: trend / decline")
+gsc_prev_file = None if use_samples else st.file_uploader(
+    "GSC — previous period (same shape as your GSC export). Enables decline detection.",
+    type=["csv", "xlsx", "xls"], key="up_gsc_prev")
+
 if results:
     merged = loaders.merge_sources(
         results.get("frog"), results.get("gsc"), results.get("ga4"), results.get("backlinks")
     )
+    if gsc_prev_file is not None:
+        try:
+            prev_res = _cached_load(loaders.load_gsc, gsc_prev_file.getvalue(), gsc_prev_file.name)
+            merged = loaders.attach_previous_clicks(merged, prev_res)
+            st.caption("📉 Previous-period GSC attached — declining pages will be flagged for refresh.")
+        except Exception as exc:  # noqa: BLE001
+            st.warning(f"Could not attach previous-period GSC: {exc}")
     ss["loaders"] = results
     ss["merged"] = merged
     ss["signals"] = None
@@ -89,6 +102,19 @@ if results:
             ". URLs likely don't match across exports (protocol, www, trailing slash, "
             "or path-only). Check those exports' URL format."
         )
+
+    # Per-signal coverage: % of the inventory that actually has each signal.
+    signal_cols = [c for c in ["clicks_12mo", "impressions_12mo", "avg_position",
+                               "sessions_12mo", "non_organic_sessions_12mo", "conversions_12mo",
+                               "revenue_12mo", "referring_domains", "word_count", "last_modified"]
+                   if c in merged.columns]
+    if signal_cols and len(merged):
+        cov = pd.DataFrame({
+            "signal": signal_cols,
+            "coverage": [f"{100.0 * merged[c].notna().mean():.0f}%" for c in signal_cols],
+        })
+        st.caption("Signal coverage across the merged inventory:")
+        st.dataframe(cov, width='stretch')
 
     st.dataframe(merged.head(50), width='stretch')
 

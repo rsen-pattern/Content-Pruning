@@ -101,6 +101,10 @@ metric_cols = st.columns(len(router.ACTIONS))
 for col, action in zip(metric_cols, router.ACTIONS):
     col.metric(action.replace("_", "-"), int(counts.get(action, 0)))
 
+chart = pd.Series({a.replace("_", "-"): int(counts.get(a, 0)) for a in router.ACTIONS if counts.get(a, 0)})
+if not chart.empty:
+    st.bar_chart(chart, height=240)
+
 # --- Bi Frost enrichment --------------------------------------------------
 st.subheader("Bi Frost enrichment")
 mode = cfg.get("llm_judgment_for")
@@ -163,9 +167,14 @@ else:
 
 # --- Table ----------------------------------------------------------------
 st.subheader("All URLs")
+from utils import exporters  # local import to avoid a hard dep at module load
+decided = decided.copy()
+decided["priority_score"] = exporters.compute_priority(decided)
 action_filter = st.multiselect("Filter by action", router.ACTIONS, default=[])
 view = decided if not action_filter else decided[decided["action"].isin(action_filter)]
-cols = [c for c in ["url", "action", "reason", "source", "confidence", "destination_url",
-                    "clicks_12mo", "impressions_12mo", "avg_position", "referring_domains",
+view = view.sort_values("priority_score", ascending=False)
+cols = [c for c in ["url", "action", "reason", "priority_score", "source", "confidence", "evidence_score",
+                    "destination_url", "clicks_12mo", "clicks_change_pct", "impressions_12mo",
+                    "avg_position", "referring_domains", "needs_internal_links",
                     "topical_cluster", "intent", "note"] if c in view.columns]
 st.dataframe(view[cols], width='stretch', height=480)

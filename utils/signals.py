@@ -76,12 +76,22 @@ def compute_signals(
     out["has_year_in_url"] = out["url"].map(has_year_in_url)
     out["is_html"] = out["mime_type"].map(is_html_mime)
 
+    # LLM-assigned columns are filled later; ensure presence before staleness
+    # (intent modulates how fast a page is considered stale).
+    for col in ("topical_cluster", "intent"):
+        if col not in out:
+            out[col] = pd.NA
+
     last_mod = pd.to_datetime(out["last_modified"], errors="coerce", utc=True)
     days = (pd.Timestamp(ref) - last_mod).dt.days
     out["days_since_modified"] = days
     stale_days = config["stale_threshold_days"]
+    factors = config.get("intent_stale_factors", {}) if hasattr(config, "get") else {}
+    eff_stale = out["intent"].map(lambda i: stale_days * factors.get(str(i).lower(), 1.0)
+                                  if i is not None and not pd.isna(i) else stale_days)
+    out["effective_stale_days"] = eff_stale
     # Unknown last_modified is treated as NOT stale (avoid false refresh churn).
-    out["is_stale"] = days.fillna(0) > stale_days
+    out["is_stale"] = days.fillna(0) > eff_stale
 
     if "cannibalising_urls" not in out:
         out["cannibalising_urls"] = [[] for _ in range(len(out))]
@@ -95,10 +105,24 @@ def compute_signals(
         lambda p: expected_ctr(p, curve) if pd.notna(p) else pd.NA
     )
 
-    # LLM-assigned columns are filled later; ensure presence.
-    for col in ("topical_cluster", "intent"):
-        if col not in out:
-            out[col] = pd.NA
+    # Evidence score: fraction of uploaded sources that actually covered this URL.
+    present_cols = [c for c in out.columns if c.startswith("present_")]
+    if present_cols:
+        out["evidence_score"] = out[present_cols].fillna(False).astype(bool).mean(axis=1).round(2)
+    else:
+        out["evidence_score"] = 1.0
+
+    # Trend / decline (only when a previous-period GSC export was supplied).
+    if "clicks_prev_12mo" in out:
+        prev = pd.to_numeric(out["clicks_prev_12mo"], errors="coerce")
+        cur = pd.to_numeric(out["clicks_12mo"], errors="coerce").fillna(0)
+        change = (cur - prev) / prev.where(prev > 0)
+        out["clicks_change_pct"] = change.round(3)
+        decline_pct = config.get("trend_decline_pct", -0.2) if hasattr(config, "get") else -0.2
+        out["is_declining"] = change.fillna(0) <= decline_pct
+    else:
+        out["clicks_change_pct"] = pd.NA
+        out["is_declining"] = False
     return out
 
 

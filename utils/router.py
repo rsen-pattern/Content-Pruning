@@ -137,6 +137,7 @@ def _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known
     has_year = bool(_g(rec, "has_year_in_url", False))
     cannibal = _g(rec, "cannibalising_count", 0)
     expected = rec.get("expected_ctr") if hasattr(rec, "get") else None
+    declining = bool(_g(rec, "is_declining", False))
 
     keep_t = config["keep_threshold"]
     sw_lo = config["sweet_spot_position_low"]
@@ -174,6 +175,11 @@ def _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known
             return Decision(DELETE_410, "non-html-unused",
                             note="Non-HTML asset with no links and no traffic.")
         return Decision(KEEP, "non-html-default")
+
+    # --- Refresh: declining earner (needs previous-period trend data) ------
+    if clicks_known and clicks >= keep_t and declining:
+        return Decision(REFRESH, "refresh-declining",
+                        note="Still high-traffic but clicks are trending down — refresh before it slips.")
 
     # --- Strong keep --------------------------------------------------------
     if clicks_known and clicks >= keep_t and not is_stale:
@@ -266,6 +272,10 @@ def run_router(signals_df: pd.DataFrame, config, availability: Optional[dict] = 
     dec_df = pd.DataFrame([d.as_dict() for d in decisions])
     out = pd.concat([signals_df.reset_index(drop=True), dec_df], axis=1)
     out = assign_redirect_targets(out)
+    # Orphan remediation: a valuable page with no internal links in needs them.
+    if "is_orphan" in out:
+        keeper = out["action"].isin([KEEP, REFRESH, SCHEDULE_UPDATE, CONSOLIDATE])
+        out["needs_internal_links"] = out["is_orphan"].fillna(False).astype(bool) & keeper
     return out
 
 
