@@ -154,18 +154,44 @@ def action_counts(decided: pd.DataFrame) -> dict:
     return {k: int(v) for k, v in decided["action"].value_counts().to_dict().items()}
 
 
-def snapshot_json(decided: pd.DataFrame, config, meta: Optional[dict] = None) -> bytes:
+def snapshot_json(decided: pd.DataFrame, config, meta: Optional[dict] = None,
+                  llm_overrides: Optional[dict] = None,
+                  manual_overrides: Optional[dict] = None,
+                  assignments: Optional[dict] = None) -> bytes:
+    """Full audit state. Persists LLM judgments + cluster/intent assignments so a
+    future run can restore them (no re-paying for the same LLM calls)."""
     records = json.loads(_view(decided).to_json(orient="records"))
     payload = {
-        "schema": "content-audit-engine/snapshot/v1",
+        "schema": "content-audit-engine/snapshot/v2",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "config": config.as_dict() if hasattr(config, "as_dict") else dict(config),
         "counts": action_counts(decided),
         "url_count": int(len(decided)),
         "decisions": records,
+        "llm_overrides": llm_overrides or {},
+        "manual_overrides": manual_overrides or {},
+        "assignments": assignments or {},  # url -> {topical_cluster, intent}
         "meta": meta or {},
     }
     return json.dumps(payload, indent=2, default=str).encode("utf-8")
+
+
+def assignments_from_decided(decided: pd.DataFrame) -> dict:
+    """Extract {url: {topical_cluster, intent}} for any URL that has them."""
+    if decided.empty or "url" not in decided:
+        return {}
+    out = {}
+    for _, r in decided.iterrows():
+        cluster = r.get("topical_cluster")
+        intent = r.get("intent")
+        rec = {}
+        if cluster is not None and not pd.isna(cluster):
+            rec["topical_cluster"] = cluster
+        if intent is not None and not pd.isna(intent):
+            rec["intent"] = intent
+        if rec:
+            out[r["url"]] = rec
+    return out
 
 
 # --------------------------------------------------------------------------- #

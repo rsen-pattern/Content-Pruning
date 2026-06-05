@@ -120,10 +120,10 @@ def load_screaming_frog(file: Any, filename: str = "") -> LoadResult:
     spec = {
         "url": ["address", "url"],
         "status_code": ["status code", "status"],
-        "is_indexable": ["indexability"],
-        "word_count": ["word count"],
-        "internal_links_in": ["unique inlinks", "inlinks"],
-        "last_modified": ["last modified"],
+        "is_indexable": ["indexability", "indexability status"],
+        "word_count": ["word count", "words"],
+        "internal_links_in": ["unique inlinks", "inlinks", "links in", "internal inlinks"],
+        "last_modified": ["last modified", "last-modified", "modified"],
         "title": ["title 1", "title"],
         "h1": ["h1-1", "h1"],
         "mime_type": ["content type", "content-type", "mime"],
@@ -162,12 +162,12 @@ def load_gsc(file: Any, filename: str = "") -> LoadResult:
     When a query column is present we derive top_query per URL and the
     cannibalisation map (queries shared across URLs)."""
     df = _read_any(file, filename)
-    page_col = _find_col(df, ["page", "landing page", "top pages", "url", "address"])
-    query_col = _find_col(df, ["query", "search query", "keyword"])
+    page_col = _find_col(df, ["page", "landing page", "top pages", "url", "address", "full url"])
+    query_col = _find_col(df, ["query", "search query", "keyword", "queries"])
     clicks_col = _find_col(df, ["clicks", "url clicks"])
     imp_col = _find_col(df, ["impressions", "impr"])
-    ctr_col = _find_col(df, ["ctr", "click through"])
-    pos_col = _find_col(df, ["position", "avg. pos", "average position"])
+    ctr_col = _find_col(df, ["ctr", "click through", "click-through rate"])
+    pos_col = _find_col(df, ["position", "avg. pos", "average position", "avg position"])
 
     warnings: list[str] = []
     found: dict[str, str] = {}
@@ -227,11 +227,12 @@ def load_gsc(file: Any, filename: str = "") -> LoadResult:
 # --------------------------------------------------------------------------- #
 def load_ga4(file: Any, filename: str = "") -> LoadResult:
     df = _read_any(file, filename)
-    page_col = _find_col(df, ["page path", "landing page", "page", "url", "address"])
-    sessions_col = _find_col(df, ["sessions", "session"])
+    page_col = _find_col(df, ["page path", "page path and screen class", "landing page",
+                              "page", "url", "address", "full url"])
+    sessions_col = _find_col(df, ["sessions", "session", "total sessions"])
     eng_col = _find_col(df, ["engagement rate", "engaged sessions rate"])
-    conv_col = _find_col(df, ["conversions", "key events", "total conversions"])
-    rev_col = _find_col(df, ["total revenue", "revenue", "purchase revenue"])
+    conv_col = _find_col(df, ["conversions", "key events", "total conversions", "total key events"])
+    rev_col = _find_col(df, ["total revenue", "revenue", "purchase revenue", "event revenue"])
     channel_col = _find_col(df, ["default channel group", "channel group", "channel", "source / medium", "session source"])
 
     warnings: list[str] = []
@@ -292,9 +293,9 @@ def load_ga4(file: Any, filename: str = "") -> LoadResult:
 def load_backlinks(file: Any, filename: str = "") -> LoadResult:
     df = _read_any(file, filename)
     spec = {
-        "url": ["url", "target url", "page", "page url", "address"],
-        "referring_domains": ["referring domains", "ref domains", "referring domain", "rd"],
-        "backlinks": ["backlinks", "total backlinks", "ext. backlinks", "number of backlinks"],
+        "url": ["url", "target url", "target", "target page", "page", "page url", "address"],
+        "referring_domains": ["referring domains", "ref domains", "referring domain", "domains", "rd"],
+        "backlinks": ["backlinks", "total backlinks", "ext. backlinks", "ext backlinks", "number of backlinks"],
     }
     found, warnings = _column_map(df, spec, "Backlinks")
     if "url" not in found:
@@ -311,6 +312,41 @@ def load_backlinks(file: Any, filename: str = "") -> LoadResult:
 # --------------------------------------------------------------------------- #
 # Merge                                                                        #
 # --------------------------------------------------------------------------- #
+def _infer_base_url(results: list[LoadResult]) -> Optional[str]:
+    """Most common scheme://host across sources that carry absolute URLs.
+
+    Used to repair path-only exports (GA4 often emits '/path' not the full URL),
+    which would otherwise silently fail to join the inventory."""
+    hosts: dict[str, int] = {}
+    for res in results:
+        if res is None or not res.ok:
+            continue
+        for u in res.df["url"].dropna().astype(str):
+            parts = urlsplit(u)
+            if parts.netloc:
+                hosts[f"{parts.scheme}://{parts.netloc}"] = hosts.get(f"{parts.scheme}://{parts.netloc}", 0) + 1
+    return max(hosts, key=hosts.get) if hosts else None
+
+
+def _reconcile_urls(df: pd.DataFrame, base: Optional[str]) -> pd.DataFrame:
+    """Prefix path-only URLs (empty host) with the inferred base host."""
+    if not base or df.empty or "url" not in df:
+        return df
+    bp = urlsplit(base)
+
+    def fix(u):
+        if not isinstance(u, str):
+            return u
+        p = urlsplit(u)
+        if not p.netloc:
+            return urlunsplit((bp.scheme, bp.netloc, p.path or "/", p.query, ""))
+        return u
+
+    df = df.copy()
+    df["url"] = df["url"].map(fix)
+    return df
+
+
 def merge_sources(
     frog: Optional[LoadResult] = None,
     gsc: Optional[LoadResult] = None,
@@ -319,15 +355,37 @@ def merge_sources(
 ) -> pd.DataFrame:
     """Outer-join all available sources on the normalised URL.
 
-    Screaming Frog is the spine when present (it enumerates the inventory);
-    otherwise the union of whatever URLs we have."""
-    frames = []
-    for res in (frog, gsc, ga4, backlinks):
-        if res is not None and res.ok:
-            frames.append(res.df)
-    if not frames:
+    Path-only URLs are reconciled against the inferred site host first, so a
+    GA4 'Page path' export still joins a Screaming Frog absolute-URL crawl.
+    Screaming Frog is the spine when present; otherwise the union of URLs."""
+    results = [r for r in (frog, gsc, ga4, backlinks) if r is not None and r.ok]
+    if not results:
         return pd.DataFrame()
+    base = _infer_base_url(results)
+    frames = [_reconcile_urls(r.df, base) for r in results]
     merged = frames[0]
     for f in frames[1:]:
         merged = merged.merge(f, on="url", how="outer")
     return merged.reset_index(drop=True)
+
+
+def join_report(results: dict, merged: pd.DataFrame) -> pd.DataFrame:
+    """Per-source diagnostics: rows loaded and what % joined the inventory.
+
+    `results` maps source-key -> LoadResult. A low match rate usually means a
+    URL-format mismatch (protocol, www, trailing slash, path-only)."""
+    valid = {k: r for k, r in results.items() if r is not None and r.ok}
+    base = _infer_base_url(list(valid.values()))
+    reconciled = {k: set(_reconcile_urls(r.df, base)["url"].dropna()) for k, r in valid.items()}
+    rows = []
+    for key, res in results.items():
+        if key not in valid:
+            rows.append({"source": key, "rows": 0, "matched": 0, "match_rate": "—"})
+            continue
+        urls = reconciled[key]
+        # Match against the union of the OTHER sources, not the unioned merge.
+        others = set().union(*[u for k, u in reconciled.items() if k != key]) if len(reconciled) > 1 else set()
+        matched = len(urls & others)
+        rate = f"{100.0 * matched / len(urls):.0f}%" if urls and others else "—"
+        rows.append({"source": key, "rows": res.rows, "matched": matched, "match_rate": rate})
+    return pd.DataFrame(rows)

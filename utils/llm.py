@@ -22,6 +22,7 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
 import pandas as pd
+from pydantic import BaseModel, ValidationError, field_validator
 
 from utils.bifrost import call_with_fallback, estimate_chars_as_tokens, estimate_cost_usd
 from utils.prompts import load_prompt, render
@@ -37,6 +38,44 @@ def normalize_action(raw: object) -> str:
     """Map a model's free-form action to a known action; unknown -> AMBIGUOUS."""
     act = str(raw or "").strip().lower().replace("-", "_").replace(" ", "_")
     return act if act in _VALID_ACTIONS else AMBIGUOUS
+
+
+class JudgmentItem(BaseModel):
+    """Validated shape of one ambiguous-judgment result."""
+    url: str
+    action: str = AMBIGUOUS
+    rationale: str = ""
+    confidence: float = 0.0
+
+    @field_validator("action", mode="before")
+    @classmethod
+    def _norm_action(cls, v):
+        return normalize_action(v)
+
+    @field_validator("confidence", mode="before")
+    @classmethod
+    def _clamp_conf(cls, v):
+        try:
+            return min(1.0, max(0.0, float(v)))
+        except (TypeError, ValueError):
+            return 0.0
+
+
+def parse_judgment_items(parsed) -> dict[str, dict]:
+    """Validate a parsed JSON array into {url: {action, rationale, confidence}}.
+    Malformed items are skipped rather than crashing the run."""
+    out: dict[str, dict] = {}
+    if not isinstance(parsed, list):
+        return out
+    for item in parsed:
+        if not isinstance(item, dict) or not item.get("url"):
+            continue
+        try:
+            v = JudgmentItem(**item)
+        except ValidationError:
+            continue
+        out[v.url] = {"action": v.action, "rationale": v.rationale, "confidence": v.confidence}
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -234,15 +273,7 @@ def judge_ambiguous(client, model, df: pd.DataFrame, guides_context: str,
         user = render("ambiguous_judgment", guides_context=guides_context,
                       pages_block=_ambiguous_block(sub, fetch))
         text, used = call_with_fallback(client, model, _SYSTEM, user, max_tokens=2000)
-        parsed = _extract_json(text) or []
-        if isinstance(parsed, list):
-            for item in parsed:
-                if isinstance(item, dict) and item.get("url"):
-                    out[str(item["url"])] = {
-                        "action": normalize_action(item.get("action")),
-                        "rationale": str(item.get("rationale", "")),
-                        "confidence": float(item.get("confidence", 0.0) or 0.0),
-                    }
+        out.update(parse_judgment_items(_extract_json(text)))
     return out, used
 
 

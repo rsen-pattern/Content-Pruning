@@ -102,7 +102,27 @@ def find_html_equivalent(url: str, html_urls: set[str]) -> Optional[str]:
 # --------------------------------------------------------------------------- #
 # Per-URL routing                                                              #
 # --------------------------------------------------------------------------- #
-def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
+_ALL_AVAILABLE = {"gsc": True, "ga4": True, "backlinks": True, "frog": True}
+# Only destructive actions remove/redirect the URL and would break a conversion
+# path. NOINDEX keeps the page live (email/direct still work), so it isn't guarded.
+_DESTRUCTIVE_ACTIONS = {DELETE_301, DELETE_410}
+
+
+def route(rec: Any, config, html_urls: Optional[set[str]] = None,
+          avail: Optional[dict] = None) -> Decision:
+    """Route one URL. `avail` records which sources were uploaded; traffic- and
+    link-based DELETIONS are suppressed (escalated to AMBIGUOUS) when the source
+    that would justify them is absent — so missing data never reads as 'zero'."""
+    avail = avail or _ALL_AVAILABLE
+    clicks_known = avail.get("gsc", True)     # clicks / impressions / position / ctr
+    traffic_known = avail.get("ga4", True)    # sessions / non-organic / conversions / revenue
+    links_known = avail.get("backlinks", True)  # referring domains / backlinks
+
+    decision = _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known)
+    return _apply_guardrails(decision, rec, config, traffic_known)
+
+
+def _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known) -> Decision:
     clicks = _g(rec, "clicks_12mo", 0)
     impressions = _g(rec, "impressions_12mo", 0)
     position = rec.get("avg_position") if hasattr(rec, "get") else None
@@ -129,9 +149,12 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
     thin_wc = config["thin_word_count"]
     preserve = config["preserve_non_organic_as_keep"]
 
+    # Shorthands: "no organic clicks" is only assertable when GSC was uploaded.
+    no_clicks = clicks_known and clicks == 0
+
     # --- (4) Already excluded from index -----------------------------------
-    if not is_indexable and clicks == 0:
-        if ref_domains >= 1:
+    if not is_indexable and no_clicks:
+        if links_known and ref_domains >= 1:
             return Decision(DELETE_301, "already-deindexed-with-equity",
                             note="Noindex page carries link equity — redirect to preserve it.")
         return Decision(NO_ACTION, "already-deindexed",
@@ -139,7 +162,7 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
 
     # --- Non-HTML simplified path ------------------------------------------
     if not is_html:
-        if ref_domains >= 1:
+        if links_known and ref_domains >= 1:
             twin = find_html_equivalent(_g(rec, "url", ""), html_urls or set())
             if twin:
                 return Decision(DELETE_301, "non-html-redirect-to-equivalent",
@@ -147,45 +170,45 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
                                 note="Linked non-HTML asset has an HTML equivalent — redirect/canonicalise.")
             return Decision(KEEP, "non-html-linked-asset",
                             note="Non-HTML asset earns external links and has no HTML twin — keep.")
-        if clicks == 0 and non_org <= non_org_t:
+        if links_known and no_clicks and (not traffic_known or non_org <= non_org_t):
             return Decision(DELETE_410, "non-html-unused",
                             note="Non-HTML asset with no links and no traffic.")
         return Decision(KEEP, "non-html-default")
 
     # --- Strong keep --------------------------------------------------------
-    if clicks >= keep_t and not is_stale:
+    if clicks_known and clicks >= keep_t and not is_stale:
         return Decision(KEEP, "strong-keep")
 
     # --- Refresh: stale but earning ----------------------------------------
-    if clicks >= keep_t and is_stale:
+    if clicks_known and clicks >= keep_t and is_stale:
         return Decision(REFRESH, "refresh-stale-earner",
                         note="High traffic but content is stale.")
 
     # --- (3) Consolidate: cannibalisation (moved ahead of refresh) ---------
-    if cannibal > 0:
+    if clicks_known and cannibal > 0:
         return Decision(CONSOLIDATE, "cannibalisation",
                         note="Competes with sibling URL(s) for its top query — group and pick a winner.")
 
     # --- Refresh: sweet-spot position --------------------------------------
-    if position is not None and pd.notna(position) and sw_lo <= position <= sw_hi and impressions >= sw_imp:
+    if clicks_known and position is not None and pd.notna(position) and sw_lo <= position <= sw_hi and impressions >= sw_imp:
         return Decision(REFRESH, "refresh-sweet-spot",
                         note="Page-2/striking-distance position with real impressions.")
 
     # --- (2) Refresh: CTR underperformance (with impressions floor) --------
-    if (position is not None and pd.notna(position) and position <= 10
+    if (clicks_known and position is not None and pd.notna(position) and position <= 10
             and impressions >= ctr_min_imp
             and expected is not None and pd.notna(expected)
             and (ctr if ctr is not None and pd.notna(ctr) else 0) < expected * ctr_ratio):
         return Decision(REFRESH, "refresh-title-meta",
                         note="Ranks top-10 but CTR is below the position baseline — title/meta opportunity.")
 
-    # --- Schedule update: known obsolescence -------------------------------
+    # --- Schedule update: known obsolescence (data-independent) ------------
     if has_year:
         return Decision(SCHEDULE_UPDATE, "scheduled-obsolescence",
                         note="Dated URL — set a recurring update cadence.")
 
     # --- (1) Useful but unindexed (checked BEFORE the 301) -----------------
-    if clicks == 0 and non_org > non_org_t:
+    if traffic_known and no_clicks and non_org > non_org_t:
         if preserve:
             return Decision(KEEP, "non-organic-keep",
                             note="No organic clicks but meaningful non-organic traffic — preserve visibility.")
@@ -193,17 +216,17 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
                         note="Earns its keep off non-organic channels — noindex rather than redirect away.")
 
     # --- Preserve link equity ----------------------------------------------
-    if clicks == 0 and ref_domains >= 1:
+    if links_known and no_clicks and ref_domains >= 1:
         return Decision(DELETE_301, "preserve-link-equity",
                         note="No organic value but external links — redirect to closest topical match.")
 
     # --- Hard delete --------------------------------------------------------
-    if clicks == 0 and ref_domains == 0 and days_old > age_410:
+    if links_known and no_clicks and ref_domains == 0 and days_old > age_410:
         return Decision(DELETE_410, "hard-delete",
                         note="No clicks, no links, and old — safe to 410.")
 
     # --- (5) Thin-page catch (keeps the LLM bill sane) ---------------------
-    if clicks == 0 and ref_domains == 0 and 0 < word_count < thin_wc:
+    if links_known and no_clicks and ref_domains == 0 and 0 < word_count < thin_wc:
         return Decision(NOINDEX, "thin-no-value",
                         note="Thin, link-less, click-less page — noindex deterministically.")
 
@@ -211,18 +234,35 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None) -> Decision:
     return Decision(AMBIGUOUS, "needs-judgment")
 
 
+def _apply_guardrails(decision: Decision, rec, config, traffic_known: bool) -> Decision:
+    """Safety net: never auto-delete a page that converts or earns revenue,
+    even with zero organic clicks (e.g. paid-landing / email pages)."""
+    if (decision.action in _DESTRUCTIVE_ACTIONS and traffic_known
+            and config.get("protect_conversions", True)):
+        conv = _g(rec, "conversions_12mo", 0)
+        rev = _g(rec, "revenue_12mo", 0)
+        if conv >= config.get("protect_conversions_floor", 1) or rev >= config.get("protect_revenue_floor", 1.0):
+            return Decision(KEEP, "protected-converter",
+                            note=(f"Has {conv:g} conversions / {rev:g} revenue — protected from "
+                                  f"deletion despite no organic clicks (would have been {decision.action})."))
+    return decision
+
+
 # --------------------------------------------------------------------------- #
 # Whole-inventory pass                                                          #
 # --------------------------------------------------------------------------- #
-def run_router(signals_df: pd.DataFrame, config) -> pd.DataFrame:
-    """Apply route() to every URL, then resolve 301 destinations."""
+def run_router(signals_df: pd.DataFrame, config, availability: Optional[dict] = None) -> pd.DataFrame:
+    """Apply route() to every URL, then resolve 301 destinations.
+
+    `availability` maps source -> bool (gsc/ga4/backlinks/frog). When omitted,
+    all sources are assumed present (back-compatible)."""
     if signals_df.empty:
         return signals_df.copy()
     html_urls = set(
         signals_df.loc[signals_df.get("is_html", True) == True, "url"]  # noqa: E712
     ) if "is_html" in signals_df else set(signals_df["url"])
 
-    decisions = [route(row, config, html_urls) for _, row in signals_df.iterrows()]
+    decisions = [route(row, config, html_urls, availability) for _, row in signals_df.iterrows()]
     dec_df = pd.DataFrame([d.as_dict() for d in decisions])
     out = pd.concat([signals_df.reset_index(drop=True), dec_df], axis=1)
     out = assign_redirect_targets(out)

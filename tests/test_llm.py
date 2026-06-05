@@ -46,6 +46,20 @@ def test_judge_ambiguous_normalises(monkeypatch=None):
     assert used == "anthropic/claude-sonnet-4-6"
 
 
+def test_parse_judgment_items_validates():
+    parsed = [
+        {"url": "https://e.com/a", "action": "Refresh", "confidence": 1.7},  # clamp
+        {"url": "https://e.com/b", "action": "delete-301"},                  # default conf
+        {"action": "keep"},                                                  # no url -> skip
+        "garbage",                                                            # not a dict -> skip
+    ]
+    out = llm.parse_judgment_items(parsed)
+    assert set(out) == {"https://e.com/a", "https://e.com/b"}
+    assert out["https://e.com/a"]["action"] == REFRESH
+    assert out["https://e.com/a"]["confidence"] == 1.0  # clamped
+    assert out["https://e.com/b"]["action"] == DELETE_301
+
+
 def test_estimate_respects_fetch():
     df = pd.DataFrame({"url": [f"https://e.com/{i}" for i in range(10)], "title": [""] * 10})
     guides = "g" * 500

@@ -18,10 +18,11 @@ show_llm_banners()
 
 
 def rebuild_decisions():
-    """Re-route from current signals, then re-apply saved LLM judgments so a
-    deterministic re-run never clobbers LLM work."""
-    decided = router.run_router(ss["signals"], cfg)
+    """Re-route from current signals, then re-apply saved LLM judgments and
+    manual overrides (manual wins) so a deterministic re-run is non-destructive."""
+    decided = router.run_router(ss["signals"], cfg, ss.get("availability"))
     decided = router.apply_overrides(decided, ss.get("llm_overrides", {}))
+    decided = router.apply_overrides(decided, ss.get("manual_overrides", {}))
     ss["decided"] = router.assign_redirect_targets(decided)
 
 
@@ -38,6 +39,58 @@ if st.button("↻ Re-run deterministic audit (after config changes)"):
     st.success("Router re-run with current configuration. Saved LLM judgments preserved.")
 if ss.get("llm_overrides"):
     st.caption(f"💾 {len(ss['llm_overrides'])} saved LLM judgment(s) are re-applied on every re-run.")
+if ss.get("manual_overrides"):
+    st.caption(f"✍️ {len(ss['manual_overrides'])} manual override(s) active (win over rules & LLM).")
+
+# --- Restore LLM state from a prior snapshot (avoid re-paying) -------------
+with st.expander("Restore LLM state from a snapshot (skip re-running paid calls)"):
+    st.caption("Upload a snapshot.json from a previous run to restore its saved LLM "
+               "judgments, manual overrides and cluster/intent assignments.")
+    snap = st.file_uploader("snapshot.json", type=["json"], key="restore_snap")
+    if snap is not None and st.button("Restore"):
+        try:
+            data = json.load(snap)
+            ss["llm_overrides"].update(data.get("llm_overrides", {}))
+            ss["manual_overrides"].update(data.get("manual_overrides", {}))
+            assigns = data.get("assignments", {})
+            if assigns and ss.get("signals") is not None:
+                sig = ss["signals"]
+                sig["topical_cluster"] = sig.apply(
+                    lambda r: assigns.get(r["url"], {}).get("topical_cluster", r.get("topical_cluster")), axis=1)
+                sig["intent"] = sig.apply(
+                    lambda r: assigns.get(r["url"], {}).get("intent", r.get("intent")), axis=1)
+            rebuild_decisions()
+            st.success(f"Restored {len(data.get('llm_overrides', {}))} LLM judgment(s), "
+                       f"{len(data.get('manual_overrides', {}))} manual override(s), "
+                       f"{len(assigns)} assignment(s).")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Could not read snapshot: {exc}")
+
+# --- Manual override round-trip -------------------------------------------
+with st.expander("Apply manual overrides (upload an edited Decision Spreadsheet)"):
+    st.caption("Edit the `manual_override` column in the Decision Spreadsheet (page 7) to any "
+               f"valid action ({', '.join(router.ACTIONS)}), then upload it here. Manual overrides "
+               "win over rules and LLM and survive re-runs.")
+    ov_file = st.file_uploader("Edited Decision Spreadsheet (XLSX)", type=["xlsx"], key="manual_ov")
+    if ov_file is not None and st.button("Apply manual overrides"):
+        try:
+            edited = pd.read_excel(ov_file)
+            applied = 0
+            if "manual_override" in edited and "url" in edited:
+                for _, r in edited.iterrows():
+                    val = str(r.get("manual_override") or "").strip().lower().replace("-", "_").replace(" ", "_")
+                    if val in router.ACTIONS:
+                        ss["manual_overrides"][str(r["url"])] = {
+                            "action": val, "reason": "manual-override", "source": "manual",
+                            "note": "Set via uploaded Decision Spreadsheet.",
+                        }
+                        applied += 1
+                rebuild_decisions()
+                st.success(f"Applied {applied} manual override(s).")
+            else:
+                st.error("Spreadsheet needs both `url` and `manual_override` columns.")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Could not read spreadsheet: {exc}")
 
 decided = ss["decided"]
 

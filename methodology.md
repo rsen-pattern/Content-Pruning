@@ -65,6 +65,27 @@ These five intentional changes were approved before implementation:
 5. **Thin-page catch** (step 12) routes thin, link-less, click-less pages
    deterministically to `NOINDEX` instead of escalating thousands of them to the LLM.
 
+## Safety & data-availability (Layer A)
+
+The router never lets *missing* data read as *zero*:
+
+- **Data-availability gating.** Each run records which sources were uploaded
+  (`gsc / ga4 / backlinks / frog`). Traffic- and link-based **deletions** only
+  fire when the source that justifies them is present. Upload only a crawl and
+  no page is deleted on "no traffic" — those URLs escalate to AMBIGUOUS instead.
+- **Conversion/revenue guardrail.** A page is never auto-**deleted** (301/410)
+  when it has conversions ≥ `protect_conversions_floor` or revenue ≥
+  `protect_revenue_floor`, even with zero organic clicks (paid-landing / email
+  pages). NOINDEX is *not* guarded — it keeps the page live for email/direct,
+  only removing it from search.
+- **URL reconciliation.** Path-only exports (GA4's "Page path") are prefixed
+  with the inferred site host before joining, so they don't silently fail to
+  match an absolute-URL crawl. The Data Upload page shows a per-source
+  **join-rate diagnostic**; a low rate flags a URL-format mismatch.
+- **Manual override round-trip.** Edit the `manual_override` column in the
+  Decision Spreadsheet and re-upload it on the Audit page; those decisions win
+  over rules and LLM and survive deterministic re-runs.
+
 ## Configuration & provenance
 
 Every threshold has a default (**grey**), can be detected from the data

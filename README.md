@@ -89,5 +89,16 @@ tests/test_pipeline.py  # end-to-end loaders→signals→router check
 ## Tests
 
 ```bash
-python -m tests.test_pipeline
+python -m tests.test_pipeline   # loaders -> signals -> router (14 URLs)
+python -m tests.test_safety     # availability gating, delete guardrails, URL join
+python -m tests.test_llm        # JSON parsing, action normalisation, Pydantic validation
 ```
+
+CI (`.github/workflows/tests.yml`) byte-compiles every module and runs all three
+suites on push/PR.
+
+## Re-using LLM work across runs
+
+The Snapshot JSON (Deliverables) stores the LLM judgments, manual overrides and
+cluster/intent assignments. On the Audit page, **Restore LLM state from a
+snapshot** re-applies them so you don't re-pay for the same Bi Frost calls.
