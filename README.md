@@ -29,9 +29,20 @@ Then, in the app:
 
 ### Bi Frost key
 
-Set `BIFROST_API_KEY` (or `BIFROST_KEY`) as an env var or in
-`.streamlit/secrets.toml`, or paste it in the sidebar. Without a key the
-deterministic audit still runs fully — only the LLM steps are disabled.
+The key resolves with this precedence (the sidebar shows which source is active):
+
+1. **Sidebar input** — pasted in the password field (persists across pages).
+2. **`st.secrets`** — `.streamlit/secrets.toml` (see `.streamlit/secrets.toml.example`)
+   or Streamlit Cloud secrets.
+3. **Environment** — `BIFROST_API_KEY` or the legacy `BIFROST_KEY`.
+
+```toml
+# .streamlit/secrets.toml   (gitignored)
+BIFROST_API_KEY = "your-bifrost-key-here"
+```
+
+Without a key the deterministic audit still runs fully — only the LLM steps are
+disabled. The key is never logged.
 
 ## Deliverables
 

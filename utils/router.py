@@ -78,12 +78,24 @@ def _path_stem(url: str) -> str:
     return path.rstrip("/")
 
 
+def _basename_stem(url: str) -> str:
+    return _path_stem(url).rsplit("/", 1)[-1]
+
+
 def find_html_equivalent(url: str, html_urls: set[str]) -> Optional[str]:
-    """A non-HTML asset's HTML twin shares the path stem (e.g. /guide.pdf -> /guide)."""
+    """A non-HTML asset's HTML twin shares the path stem (e.g. /guide.pdf -> /guide).
+
+    Prefers a full-path-stem match, then falls back to a basename match so
+    /files/whitepaper.pdf can still resolve to /whitepaper."""
     stem = _path_stem(url)
     for h in html_urls:
-        if _path_stem(h) == stem and h != url:
+        if h != url and _path_stem(h) == stem:
             return h
+    base = _basename_stem(url)
+    if base:
+        for h in html_urls:
+            if h != url and _basename_stem(h) == base:
+                return h
     return None
 
 
@@ -215,6 +227,25 @@ def run_router(signals_df: pd.DataFrame, config) -> pd.DataFrame:
     out = pd.concat([signals_df.reset_index(drop=True), dec_df], axis=1)
     out = assign_redirect_targets(out)
     return out
+
+
+def apply_overrides(df: pd.DataFrame, overrides: dict) -> pd.DataFrame:
+    """Re-apply saved LLM (or manual) decisions onto a freshly-routed frame.
+
+    Lets the deterministic router be re-run after config changes without losing
+    judgment work. `overrides` maps url -> {action, reason, source, confidence,
+    note, destination_url?}."""
+    if df.empty or not overrides:
+        return df
+    df = df.copy()
+    for url, ov in overrides.items():
+        m = df["url"] == url
+        if not m.any():
+            continue
+        for field in ("action", "reason", "source", "confidence", "note", "destination_url"):
+            if field in ov and ov[field] is not None:
+                df.loc[m, field] = ov[field]
+    return df
 
 
 def assign_redirect_targets(df: pd.DataFrame) -> pd.DataFrame:

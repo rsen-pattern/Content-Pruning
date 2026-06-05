@@ -17,10 +17,17 @@ require("merged")
 show_llm_banners()
 
 
+def rebuild_decisions():
+    """Re-route from current signals, then re-apply saved LLM judgments so a
+    deterministic re-run never clobbers LLM work."""
+    decided = router.run_router(ss["signals"], cfg)
+    decided = router.apply_overrides(decided, ss.get("llm_overrides", {}))
+    ss["decided"] = router.assign_redirect_targets(decided)
+
+
 def run_deterministic():
-    sig = signals.compute_signals(ss["merged"], cfg)
-    ss["signals"] = sig
-    ss["decided"] = router.run_router(sig, cfg)
+    ss["signals"] = signals.compute_signals(ss["merged"], cfg)
+    rebuild_decisions()
 
 
 if ss.get("decided") is None:
@@ -28,7 +35,9 @@ if ss.get("decided") is None:
 
 if st.button("↻ Re-run deterministic audit (after config changes)"):
     run_deterministic()
-    st.success("Router re-run with current configuration.")
+    st.success("Router re-run with current configuration. Saved LLM judgments preserved.")
+if ss.get("llm_overrides"):
+    st.caption(f"💾 {len(ss['llm_overrides'])} saved LLM judgment(s) are re-applied on every re-run.")
 
 decided = ss["decided"]
 
@@ -60,7 +69,7 @@ else:
                 add_banner_if_fell_back(bm, used_i)
                 ss["signals"]["topical_cluster"] = ss["signals"]["url"].map(clusters)
                 ss["signals"]["intent"] = ss["signals"]["url"].map(intents)
-                ss["decided"] = router.run_router(ss["signals"], cfg)
+                rebuild_decisions()
             st.success(f"Clusters + intent assigned to {len(clusters)} URLs. Router re-run.")
             st.rerun()
 
@@ -87,16 +96,16 @@ else:
                     client, jm, target, guides,
                     batch_size=cfg.get("ambiguous_batch_size"), fetch=fetch)
                 add_banner_if_fell_back(jm, used)
-                d = ss["decided"]
                 for url, res in results.items():
-                    m = d["url"] == url
-                    d.loc[m, "action"] = res["action"]
-                    d.loc[m, "reason"] = "llm-judgment"
-                    d.loc[m, "source"] = "llm"
-                    d.loc[m, "confidence"] = res["confidence"]
-                    d.loc[m, "note"] = res["rationale"]
-                ss["decided"] = router.assign_redirect_targets(d)
-            st.success(f"Judged {len(results)} URLs.")
+                    ss["llm_overrides"][url] = {
+                        "action": res["action"],
+                        "reason": "llm-judgment",
+                        "source": "llm",
+                        "confidence": res["confidence"],
+                        "note": res["rationale"],
+                    }
+                rebuild_decisions()
+            st.success(f"Judged {len(results)} URLs. Saved — they survive deterministic re-runs.")
             st.rerun()
 
 # --- Table ----------------------------------------------------------------

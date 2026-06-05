@@ -23,29 +23,35 @@ _MODELS_PATH = Path(__file__).resolve().parent.parent / "config" / "models.json"
 # --------------------------------------------------------------------------- #
 # Credentials                                                                  #
 # --------------------------------------------------------------------------- #
-def get_api_key(user_value: Optional[str] = None) -> Optional[str]:
+def resolve_api_key(user_value: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
     """Three-tier precedence, highest first: user-entered, st.secrets, env.
 
-    Accepts both BIFROST_API_KEY and BIFROST_KEY (older Pattern tools use the
-    shorter name). Never logged.
+    Returns (key, source) where source is one of "input", "secrets", "env" or
+    None. Accepts both BIFROST_API_KEY and BIFROST_KEY (older Pattern tools use
+    the shorter name). Never logged.
     """
     if user_value:
-        return user_value.strip()
+        return user_value.strip(), "input"
 
     try:  # st.secrets only exists inside a Streamlit runtime
         import streamlit as st
 
         for name in ("BIFROST_API_KEY", "BIFROST_KEY"):
             if name in st.secrets:
-                return str(st.secrets[name]).strip()
+                return str(st.secrets[name]).strip(), "secrets"
     except Exception:
         pass
 
     for name in ("BIFROST_API_KEY", "BIFROST_KEY"):
         val = os.environ.get(name)
         if val:
-            return val.strip()
-    return None
+            return val.strip(), "env"
+    return None, None
+
+
+def get_api_key(user_value: Optional[str] = None) -> Optional[str]:
+    """Convenience wrapper returning just the key (see resolve_api_key)."""
+    return resolve_api_key(user_value)[0]
 
 
 # --------------------------------------------------------------------------- #

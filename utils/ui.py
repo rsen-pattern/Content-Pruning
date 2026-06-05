@@ -9,7 +9,7 @@ from typing import Optional
 
 import streamlit as st
 
-from utils.bifrost import get_api_key, get_client, load_models
+from utils.bifrost import get_client, load_models, resolve_api_key
 from utils.config import PROVENANCE_COLOURS, Config
 
 
@@ -22,6 +22,7 @@ def init_state() -> None:
     ss.setdefault("decided", None)
     ss.setdefault("refresh_suggestions", {})
     ss.setdefault("repurpose_suggestions", {})
+    ss.setdefault("llm_overrides", {})  # url -> {action, reason, source, confidence, note}
     ss.setdefault("llm_banners", [])
     ss.setdefault("guides_loaded", False)
 
@@ -36,18 +37,20 @@ def bifrost_sidebar() -> Optional[object]:
     """Render the Bi Frost connection control; return an OpenAI client or None."""
     with st.sidebar:
         st.markdown("### Bi Frost")
-        existing = get_api_key()
+        existing_key, existing_source = resolve_api_key()
         user_key = st.text_input(
             "API key",
             type="password",
+            key="bifrost_api_key",  # stable key so the paste persists across pages
             help="Loaded from BIFROST_API_KEY / st.secrets if blank. Never logged.",
-            placeholder="••••••" if existing else "paste key or set secret",
+            placeholder="••••••" if existing_key else "paste key or set secret",
         )
-        key = get_api_key(user_key)
+        key, source = resolve_api_key(user_key)
         if not key:
             st.caption("⚪ No key — LLM steps disabled; deterministic audit still works.")
             return None
-        st.caption("🟢 Key loaded.")
+        source_label = {"input": "sidebar input", "secrets": "st.secrets", "env": "environment"}
+        st.caption(f"🟢 Key loaded from **{source_label.get(source, source)}**.")
         try:
             return get_client(key)
         except Exception as exc:  # noqa: BLE001
