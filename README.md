@@ -52,7 +52,12 @@ disabled. The key is never logged.
 4. Consolidation Plan (XLSX: clusters, winners, redirects, merge notes)
 5. Repurpose Backlog (XLSX)
 6. Snapshot JSON (for next audit's comparison)
-7. Executive Summary (Markdown)
+7. Executive Summary (Markdown + PDF)
+8. Action Plan (XLSX, priority-ranked across all actions)
+
+The Audit page shows an action-distribution chart and a priority-ranked table;
+uploading a prior snapshot on Deliverables produces **per-URL grading** (did the
+keepers hold? were any deletions premature?).
 
 ## Layout
 

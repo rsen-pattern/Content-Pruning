@@ -1,6 +1,7 @@
 """Data Upload — parse the four exports with graceful degradation."""
 import io
 
+import pandas as pd
 import streamlit as st
 
 from utils import loaders
@@ -101,6 +102,19 @@ if results:
             ". URLs likely don't match across exports (protocol, www, trailing slash, "
             "or path-only). Check those exports' URL format."
         )
+
+    # Per-signal coverage: % of the inventory that actually has each signal.
+    signal_cols = [c for c in ["clicks_12mo", "impressions_12mo", "avg_position",
+                               "sessions_12mo", "non_organic_sessions_12mo", "conversions_12mo",
+                               "revenue_12mo", "referring_domains", "word_count", "last_modified"]
+                   if c in merged.columns]
+    if signal_cols and len(merged):
+        cov = pd.DataFrame({
+            "signal": signal_cols,
+            "coverage": [f"{100.0 * merged[c].notna().mean():.0f}%" for c in signal_cols],
+        })
+        st.caption("Signal coverage across the merged inventory:")
+        st.dataframe(cov, width='stretch')
 
     st.dataframe(merged.head(50), width='stretch')
 

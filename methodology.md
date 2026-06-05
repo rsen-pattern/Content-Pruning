@@ -103,6 +103,19 @@ The router never lets *missing* data read as *zero*:
   sources that actually covered it. Low-evidence decisions are counted in the
   executive summary so sparse-data calls get a second look.
 
+## Workflow & outputs (Layer C)
+
+- **Signal coverage** — Data Upload shows the % of the inventory carrying each
+  signal, on top of the per-source join-rate diagnostic.
+- **Priority score** — `impact (clicks + 5×referring_domains + 0.1×revenue +
+  0.01×impressions) × per-action weight`, an advisory sequencing aid. The Audit
+  table sorts by it and the **Action Plan** deliverable ranks all non-keep work.
+- **Per-URL grading** — upload a prior snapshot on Deliverables to grade what the
+  earlier decisions did given current data (keeper held vs declined, deletion
+  safe vs premature, refresh paid off).
+- **PDF executive summary** — a dependency-free text PDF alongside the Markdown.
+- **Charts** — action distribution on the Audit page.
+
 ## Configuration & provenance
 
 Every threshold has a default (**grey**), can be detected from the data

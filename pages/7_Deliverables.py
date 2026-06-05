@@ -45,7 +45,15 @@ files = [
      "application/json"),
     ("7 · Executive Summary", "executive_summary.md",
      summary_md.encode("utf-8"), "text/markdown"),
+    ("8 · Action Plan (priority-ranked)", "action_plan.xlsx",
+     exporters.action_plan_xlsx(decided),
+     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
 ]
+
+summary_pdf = exporters.executive_summary_pdf(decided, cfg, guides_loaded)
+if summary_pdf:
+    files.append(("7b · Executive Summary (PDF)", "executive_summary.pdf",
+                  summary_pdf, "application/pdf"))
 
 st.subheader("Download")
 cols = st.columns(2)
@@ -57,7 +65,7 @@ st.divider()
 st.subheader("Executive summary preview")
 st.markdown(summary_md)
 
-# --- Compare a prior snapshot ---------------------------------------------
+# --- Compare / grade against a prior snapshot -----------------------------
 st.divider()
 st.subheader("Compare with a previous audit (optional)")
 prior = st.file_uploader("Upload a prior snapshot.json", type=["json"])
@@ -70,7 +78,16 @@ if prior is not None:
         rows = [{"action": k, "previous": prev_counts.get(k, 0),
                  "current": now_counts.get(k, 0),
                  "delta": now_counts.get(k, 0) - prev_counts.get(k, 0)} for k in keys]
+        st.markdown("**Action-count change**")
         st.dataframe(pd.DataFrame(rows), width='stretch')
         st.caption(f"Previous snapshot created {data.get('created_at', 'unknown')}.")
+
+        grades = exporters.grade_against_snapshot(decided, data)
+        if not grades.empty:
+            st.markdown("**Per-URL grading** — what the prior decisions did, given current data")
+            st.dataframe(grades, width='stretch')
+            st.download_button("Download grading (CSV)",
+                               data=grades.to_csv(index=False).encode("utf-8"),
+                               file_name="audit_grading.csv", mime="text/csv")
     except Exception as exc:  # noqa: BLE001
         st.error(f"Could not read snapshot: {exc}")

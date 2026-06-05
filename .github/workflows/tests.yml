@@ -24,5 +24,7 @@ jobs:
         run: python -m tests.test_safety
       - name: Analytical tests
         run: python -m tests.test_analytical
+      - name: Output tests
+        run: python -m tests.test_outputs
       - name: LLM unit tests
         run: python -m tests.test_llm

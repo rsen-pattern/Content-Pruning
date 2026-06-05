@@ -1,9 +1,11 @@
-"""Build the seven downloadable deliverables. Each returns bytes (or str for
-the Markdown summary) so the Streamlit page can offer a download directly.
+"""Build the downloadable deliverables. Each returns bytes (or str for the
+Markdown summary) so the Streamlit page can offer a download directly.
 
   1. decision_spreadsheet_xlsx   2. redirect_map_csv     3. refresh_queue_xlsx
   4. consolidation_plan_xlsx     5. repurpose_backlog_xlsx
   6. snapshot_json               7. executive_summary_md
+  8. action_plan_xlsx (priority-ranked)  + executive_summary_pdf
+  + grade_against_snapshot (per-URL grading vs a prior audit)
 """
 from __future__ import annotations
 
@@ -18,7 +20,7 @@ from utils import router as R
 
 # Columns surfaced in the human-facing decision spreadsheet.
 _SIGNAL_VIEW = [
-    "url", "action", "reason", "destination_url", "confidence", "source",
+    "url", "action", "reason", "priority_score", "destination_url", "confidence", "source",
     "clicks_12mo", "impressions_12mo", "avg_position", "ctr",
     "sessions_12mo", "non_organic_sessions_12mo", "conversions_12mo", "revenue_12mo",
     "referring_domains", "backlinks", "internal_links_in", "word_count",
@@ -47,6 +49,9 @@ def _view(df: pd.DataFrame) -> pd.DataFrame:
 # 1. Decision spreadsheet                                                      #
 # --------------------------------------------------------------------------- #
 def decision_spreadsheet_xlsx(decided: pd.DataFrame) -> bytes:
+    decided = decided.copy()
+    if "priority_score" not in decided:
+        decided["priority_score"] = compute_priority(decided)
     view = _view(decided)
     view["manual_override"] = ""  # user edits before re-running
     return _xlsx({"Decisions": view})
@@ -193,6 +198,150 @@ def assignments_from_decided(decided: pd.DataFrame) -> dict:
         if rec:
             out[r["url"]] = rec
     return out
+
+
+# --------------------------------------------------------------------------- #
+# 8. Priority score + Action Plan                                              #
+# --------------------------------------------------------------------------- #
+# Per-action weight (rough impact-per-effort for sequencing the work).
+_ACTION_WEIGHT = {
+    R.CONSOLIDATE: 1.0, R.REFRESH: 0.9, R.REPURPOSE: 0.7, R.DELETE_301: 0.6,
+    R.NOINDEX: 0.5, R.DELETE_410: 0.4, R.SCHEDULE_UPDATE: 0.3,
+    R.AMBIGUOUS: 0.2, R.KEEP: 0.0, R.NO_ACTION: 0.0,
+}
+
+
+def compute_priority(decided: pd.DataFrame) -> pd.Series:
+    """A rough sequencing score: impact (clicks + link equity + revenue) times a
+    per-action weight. Higher = do first. Advisory, not gospel."""
+    if decided.empty:
+        return pd.Series(dtype=float)
+    num = lambda c: pd.to_numeric(decided.get(c, 0), errors="coerce").fillna(0)  # noqa: E731
+    impact = num("clicks_12mo") + num("referring_domains") * 5 + num("revenue_12mo") * 0.1 + num("impressions_12mo") * 0.01
+    weight = decided["action"].map(_ACTION_WEIGHT).fillna(0.3)
+    return (impact * weight).round(1)
+
+
+def action_plan_xlsx(decided: pd.DataFrame) -> bytes:
+    df = decided.copy()
+    df["priority_score"] = compute_priority(df)
+    actionable = df[~df["action"].isin([R.KEEP, R.NO_ACTION])].copy()
+    actionable = actionable.sort_values("priority_score", ascending=False)
+    cols = [c for c in ["url", "action", "reason", "priority_score", "clicks_12mo",
+                        "referring_domains", "revenue_12mo", "destination_url",
+                        "needs_internal_links", "note"] if c in actionable.columns]
+    return _xlsx({"Action Plan": actionable[cols]})
+
+
+# --------------------------------------------------------------------------- #
+# Per-URL grading vs a prior snapshot                                          #
+# --------------------------------------------------------------------------- #
+def grade_against_snapshot(decided: pd.DataFrame, prior: dict) -> pd.DataFrame:
+    """Compare this audit to a prior snapshot at the URL level: what was decided
+    then, what the page is doing now, and a plain-language verdict."""
+    prior_rows = {r.get("url"): r for r in prior.get("decisions", []) if r.get("url")}
+    if not prior_rows or decided.empty:
+        return pd.DataFrame()
+    cur = decided.set_index("url")
+    out = []
+    for url, pr in prior_rows.items():
+        prior_action = pr.get("action")
+        prior_clicks = float(pr.get("clicks_12mo") or 0)
+        cur_clicks = float(cur.loc[url, "clicks_12mo"]) if url in cur.index and "clicks_12mo" in cur else 0.0
+        cur_action = cur.loc[url, "action"] if url in cur.index else "(gone from inventory)"
+        verdict = _grade_verdict(prior_action, prior_clicks, cur_clicks, url in cur.index)
+        out.append({"url": url, "prior_action": prior_action, "prior_clicks": prior_clicks,
+                    "current_clicks": cur_clicks, "current_action": cur_action, "verdict": verdict})
+    return pd.DataFrame(out).sort_values("prior_clicks", ascending=False)
+
+
+def _grade_verdict(prior_action, prior_clicks, cur_clicks, present) -> str:
+    if prior_action in (R.DELETE_301, R.DELETE_410, R.NOINDEX):
+        if not present:
+            return "Removed as planned."
+        if cur_clicks > 0:
+            return f"⚠️ Marked for removal but now has {cur_clicks:g} clicks — re-check."
+        return "Removal still looks safe (no clicks)."
+    if prior_action in (R.KEEP, R.SCHEDULE_UPDATE):
+        if prior_clicks and cur_clicks < prior_clicks * 0.5:
+            return f"⚠️ Keeper declined {100 * (1 - cur_clicks / prior_clicks):.0f}% — consider refresh."
+        if cur_clicks >= prior_clicks:
+            return "Keeper held or grew."
+        return "Keeper slightly down."
+    if prior_action == R.REFRESH:
+        if cur_clicks > prior_clicks:
+            return f"Refresh paid off (+{cur_clicks - prior_clicks:g} clicks)."
+        return "Refresh pending or not yet effective."
+    return "—"
+
+
+# --------------------------------------------------------------------------- #
+# Executive summary (PDF)                                                      #
+# --------------------------------------------------------------------------- #
+def _simple_pdf(lines: list[str]) -> bytes:
+    """Minimal dependency-free single-page PDF of text lines (Helvetica 12)."""
+    def esc(s: str) -> str:
+        return s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    wrapped: list[str] = []
+    for ln in lines:
+        ln = ln or " "
+        while len(ln) > 95:
+            wrapped.append(ln[:95])
+            ln = ln[95:]
+        wrapped.append(ln)
+    body = ["BT", "/F1 12 Tf", "50 770 Td", "15 TL"]
+    for ln in wrapped[:48]:  # one page; the Markdown summary is the full version
+        body += [f"({esc(ln)}) Tj", "T*"]
+    body.append("ET")
+    stream = "\n".join(body)
+
+    objs = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        "/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
+    ]
+    out = "%PDF-1.4\n"
+    offsets = []
+    for i, o in enumerate(objs, 1):
+        offsets.append(len(out.encode("latin-1", "replace")))
+        out += f"{i} 0 obj\n{o}\nendobj\n"
+    xref_pos = len(out.encode("latin-1", "replace"))
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n"
+    out += "".join(f"{off:010d} 00000 n \n" for off in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF"
+    return out.encode("latin-1", "replace")
+
+
+def executive_summary_pdf(decided: pd.DataFrame, config, guides_loaded: bool = False) -> Optional[bytes]:
+    """Render the executive summary to a small text PDF (no external deps)."""
+    counts = action_counts(decided)
+    total = len(decided)
+    scenario = config.get("scenario", "balanced") if hasattr(config, "get") else "balanced"
+    lines = [
+        "Content Audit - Executive Summary",
+        f"Scenario: {scenario}  |  {total} URLs  |  est. index reduction "
+        f"~{estimated_index_reduction(decided)}%",
+        "",
+        "Recommended actions:",
+    ]
+    for action in R.ACTIONS:
+        n = counts.get(action, 0)
+        if n:
+            share = f"{100.0 * n / total:.0f}%" if total else "0%"
+            lines.append(f"  - {action.replace('_', '-')}: {n} ({share})")
+    lines += [
+        "",
+        "Timeline: allow 4-8 weeks for ranking impact to settle; deploy in batches",
+        "and monitor (410s + noindex first, then 301s, then refresh/consolidation).",
+    ]
+    if not guides_loaded:
+        lines += ["", "Note: reference guides not loaded - LLM rationale and timeline citations",
+                  "are unverified against the source literature."]
+    return _simple_pdf(lines)
 
 
 # --------------------------------------------------------------------------- #
