@@ -22,7 +22,8 @@ _SIGNAL_VIEW = [
     "clicks_12mo", "impressions_12mo", "avg_position", "ctr",
     "sessions_12mo", "non_organic_sessions_12mo", "conversions_12mo", "revenue_12mo",
     "referring_domains", "backlinks", "internal_links_in", "word_count",
-    "days_since_modified", "is_indexable", "is_orphan", "has_year_in_url",
+    "days_since_modified", "is_indexable", "is_orphan", "needs_internal_links",
+    "has_year_in_url", "clicks_change_pct", "is_declining", "evidence_score",
     "topical_cluster", "intent", "top_query", "note",
 ]
 
@@ -239,6 +240,25 @@ def executive_summary_md(decided: pd.DataFrame, config, guides_loaded: bool = Fa
         "",
         f"**Estimated index reduction:** ~{reduction}% of indexable URLs "
         "(noindex + 301 + 410).",
+    ]
+
+    # Layer B insights, only when the underlying signals exist.
+    if "needs_internal_links" in decided:
+        orphans = int(decided["needs_internal_links"].fillna(False).astype(bool).sum())
+        if orphans:
+            lines.append(f"**Orphaned keepers:** {orphans} valuable page(s) have no internal "
+                         "links in — add internal links so they can rank.")
+    if "is_declining" in decided and decided["is_declining"].fillna(False).astype(bool).any():
+        declining = int(decided["is_declining"].fillna(False).astype(bool).sum())
+        lines.append(f"**Declining pages:** {declining} page(s) are trending down vs the "
+                     "previous period and were prioritised for refresh.")
+    if "evidence_score" in decided:
+        low_ev = int((pd.to_numeric(decided["evidence_score"], errors="coerce") < 0.5).sum())
+        if low_ev:
+            lines.append(f"**Low-evidence decisions:** {low_ev} URL(s) were decided on data "
+                         "from under half the sources — review before executing.")
+
+    lines += [
         "",
         "## Expected timeline",
         "",

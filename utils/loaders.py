@@ -358,15 +358,42 @@ def merge_sources(
     Path-only URLs are reconciled against the inferred site host first, so a
     GA4 'Page path' export still joins a Screaming Frog absolute-URL crawl.
     Screaming Frog is the spine when present; otherwise the union of URLs."""
-    results = [r for r in (frog, gsc, ga4, backlinks) if r is not None and r.ok]
-    if not results:
+    keyed = [(k, r) for k, r in (("frog", frog), ("gsc", gsc), ("ga4", ga4),
+                                 ("backlinks", backlinks)) if r is not None and r.ok]
+    if not keyed:
         return pd.DataFrame()
-    base = _infer_base_url(results)
-    frames = [_reconcile_urls(r.df, base) for r in results]
+    base = _infer_base_url([r for _, r in keyed])
+    frames = []
+    for key, r in keyed:
+        f = _reconcile_urls(r.df, base).copy()
+        f[f"present_{key}"] = True  # per-URL source membership for evidence scoring
+        frames.append(f)
     merged = frames[0]
     for f in frames[1:]:
         merged = merged.merge(f, on="url", how="outer")
+    for key, _ in keyed:
+        col = f"present_{key}"
+        if col in merged:
+            merged[col] = merged[col].fillna(False).astype(bool)
     return merged.reset_index(drop=True)
+
+
+def previous_clicks_frame(gsc_prev: Optional[LoadResult]) -> Optional[pd.DataFrame]:
+    """From a previous-period GSC export, return url -> clicks_prev_12mo for
+    trend/decline detection. Returns None when not provided."""
+    if gsc_prev is None or not gsc_prev.ok or "clicks_12mo" not in gsc_prev.df:
+        return None
+    out = gsc_prev.df[["url", "clicks_12mo"]].rename(columns={"clicks_12mo": "clicks_prev_12mo"})
+    return out
+
+
+def attach_previous_clicks(merged: pd.DataFrame, gsc_prev: Optional[LoadResult],
+                           base: Optional[str] = None) -> pd.DataFrame:
+    prev = previous_clicks_frame(gsc_prev)
+    if prev is None or merged.empty:
+        return merged
+    prev = _reconcile_urls(prev, base or _infer_base_url([gsc_prev]))
+    return merged.merge(prev, on="url", how="left")
 
 
 def join_report(results: dict, merged: pd.DataFrame) -> pd.DataFrame:

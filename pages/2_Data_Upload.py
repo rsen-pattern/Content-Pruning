@@ -57,10 +57,22 @@ for title, (key, fn, sample_path) in LOADERS.items():
         for w in res.warnings:
             st.warning(w)
 
+st.subheader("Optional: trend / decline")
+gsc_prev_file = None if use_samples else st.file_uploader(
+    "GSC — previous period (same shape as your GSC export). Enables decline detection.",
+    type=["csv", "xlsx", "xls"], key="up_gsc_prev")
+
 if results:
     merged = loaders.merge_sources(
         results.get("frog"), results.get("gsc"), results.get("ga4"), results.get("backlinks")
     )
+    if gsc_prev_file is not None:
+        try:
+            prev_res = _cached_load(loaders.load_gsc, gsc_prev_file.getvalue(), gsc_prev_file.name)
+            merged = loaders.attach_previous_clicks(merged, prev_res)
+            st.caption("📉 Previous-period GSC attached — declining pages will be flagged for refresh.")
+        except Exception as exc:  # noqa: BLE001
+            st.warning(f"Could not attach previous-period GSC: {exc}")
     ss["loaders"] = results
     ss["merged"] = merged
     ss["signals"] = None

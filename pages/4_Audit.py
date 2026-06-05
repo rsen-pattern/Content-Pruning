@@ -165,7 +165,8 @@ else:
 st.subheader("All URLs")
 action_filter = st.multiselect("Filter by action", router.ACTIONS, default=[])
 view = decided if not action_filter else decided[decided["action"].isin(action_filter)]
-cols = [c for c in ["url", "action", "reason", "source", "confidence", "destination_url",
-                    "clicks_12mo", "impressions_12mo", "avg_position", "referring_domains",
+cols = [c for c in ["url", "action", "reason", "source", "confidence", "evidence_score",
+                    "destination_url", "clicks_12mo", "clicks_change_pct", "impressions_12mo",
+                    "avg_position", "referring_domains", "needs_internal_links",
                     "topical_cluster", "intent", "note"] if c in view.columns]
 st.dataframe(view[cols], width='stretch', height=480)

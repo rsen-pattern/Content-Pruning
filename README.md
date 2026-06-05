@@ -91,6 +91,7 @@ tests/test_pipeline.py  # end-to-end loaders→signals→router check
 ```bash
 python -m tests.test_pipeline   # loaders -> signals -> router (14 URLs)
 python -m tests.test_safety     # availability gating, delete guardrails, URL join
+python -m tests.test_analytical # intent staleness, decline, evidence, orphan flag
 python -m tests.test_llm        # JSON parsing, action normalisation, Pydantic validation
 ```
 

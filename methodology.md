@@ -86,6 +86,23 @@ The router never lets *missing* data read as *zero*:
   Decision Spreadsheet and re-upload it on the Audit page; those decisions win
   over rules and LLM and survive deterministic re-runs.
 
+## Analytical depth (Layer B)
+
+- **Intent-weighted staleness.** The LLM-assigned `intent` modulates how fast a
+  page is "stale": transactional ×0.5, commercial ×0.7, informational ×1.0,
+  navigational ×1.5 of `stale_threshold_days`. A transactional page is flagged
+  for refresh sooner than an evergreen guide. No intent → no change.
+- **Decline detection.** Upload a previous-period GSC export on Data Upload to
+  get `clicks_change_pct`; a page dropping ≥ `trend_decline_pct` is `is_declining`
+  and a still-high-traffic decliner routes to `REFRESH (refresh-declining)` ahead
+  of strong-keep — refresh it before it slips.
+- **Orphan remediation.** A keeper (`KEEP/REFRESH/SCHEDULE_UPDATE/CONSOLIDATE`)
+  with zero internal links in is flagged `needs_internal_links` and surfaced in
+  the deliverables and executive summary.
+- **Evidence score.** Each URL gets `evidence_score` = fraction of uploaded
+  sources that actually covered it. Low-evidence decisions are counted in the
+  executive summary so sparse-data calls get a second look.
+
 ## Configuration & provenance
 
 Every threshold has a default (**grey**), can be detected from the data

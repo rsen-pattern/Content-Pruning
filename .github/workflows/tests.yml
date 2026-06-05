@@ -22,5 +22,7 @@ jobs:
         run: python -m tests.test_pipeline
       - name: Router safety tests
         run: python -m tests.test_safety
+      - name: Analytical tests
+        run: python -m tests.test_analytical
       - name: LLM unit tests
         run: python -m tests.test_llm
