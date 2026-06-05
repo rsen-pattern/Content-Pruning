@@ -120,10 +120,10 @@ def load_screaming_frog(file: Any, filename: str = "") -> LoadResult:
     spec = {
         "url": ["address", "url"],
         "status_code": ["status code", "status"],
-        "is_indexable": ["indexability"],
-        "word_count": ["word count"],
-        "internal_links_in": ["unique inlinks", "inlinks"],
-        "last_modified": ["last modified"],
+        "is_indexable": ["indexability", "indexability status"],
+        "word_count": ["word count", "words"],
+        "internal_links_in": ["unique inlinks", "inlinks", "links in", "internal inlinks"],
+        "last_modified": ["last modified", "last-modified", "modified"],
         "title": ["title 1", "title"],
         "h1": ["h1-1", "h1"],
         "mime_type": ["content type", "content-type", "mime"],
@@ -162,12 +162,12 @@ def load_gsc(file: Any, filename: str = "") -> LoadResult:
     When a query column is present we derive top_query per URL and the
     cannibalisation map (queries shared across URLs)."""
     df = _read_any(file, filename)
-    page_col = _find_col(df, ["page", "landing page", "top pages", "url", "address"])
-    query_col = _find_col(df, ["query", "search query", "keyword"])
+    page_col = _find_col(df, ["page", "landing page", "top pages", "url", "address", "full url"])
+    query_col = _find_col(df, ["query", "search query", "keyword", "queries"])
     clicks_col = _find_col(df, ["clicks", "url clicks"])
     imp_col = _find_col(df, ["impressions", "impr"])
-    ctr_col = _find_col(df, ["ctr", "click through"])
-    pos_col = _find_col(df, ["position", "avg. pos", "average position"])
+    ctr_col = _find_col(df, ["ctr", "click through", "click-through rate"])
+    pos_col = _find_col(df, ["position", "avg. pos", "average position", "avg position"])
 
     warnings: list[str] = []
     found: dict[str, str] = {}
@@ -227,11 +227,12 @@ def load_gsc(file: Any, filename: str = "") -> LoadResult:
 # --------------------------------------------------------------------------- #
 def load_ga4(file: Any, filename: str = "") -> LoadResult:
     df = _read_any(file, filename)
-    page_col = _find_col(df, ["page path", "landing page", "page", "url", "address"])
-    sessions_col = _find_col(df, ["sessions", "session"])
+    page_col = _find_col(df, ["page path", "page path and screen class", "landing page",
+                              "page", "url", "address", "full url"])
+    sessions_col = _find_col(df, ["sessions", "session", "total sessions"])
     eng_col = _find_col(df, ["engagement rate", "engaged sessions rate"])
-    conv_col = _find_col(df, ["conversions", "key events", "total conversions"])
-    rev_col = _find_col(df, ["total revenue", "revenue", "purchase revenue"])
+    conv_col = _find_col(df, ["conversions", "key events", "total conversions", "total key events"])
+    rev_col = _find_col(df, ["total revenue", "revenue", "purchase revenue", "event revenue"])
     channel_col = _find_col(df, ["default channel group", "channel group", "channel", "source / medium", "session source"])
 
     warnings: list[str] = []
@@ -292,9 +293,9 @@ def load_ga4(file: Any, filename: str = "") -> LoadResult:
 def load_backlinks(file: Any, filename: str = "") -> LoadResult:
     df = _read_any(file, filename)
     spec = {
-        "url": ["url", "target url", "page", "page url", "address"],
-        "referring_domains": ["referring domains", "ref domains", "referring domain", "rd"],
-        "backlinks": ["backlinks", "total backlinks", "ext. backlinks", "number of backlinks"],
+        "url": ["url", "target url", "target", "target page", "page", "page url", "address"],
+        "referring_domains": ["referring domains", "ref domains", "referring domain", "domains", "rd"],
+        "backlinks": ["backlinks", "total backlinks", "ext. backlinks", "ext backlinks", "number of backlinks"],
     }
     found, warnings = _column_map(df, spec, "Backlinks")
     if "url" not in found:

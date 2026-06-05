@@ -42,6 +42,30 @@ if ss.get("llm_overrides"):
 if ss.get("manual_overrides"):
     st.caption(f"✍️ {len(ss['manual_overrides'])} manual override(s) active (win over rules & LLM).")
 
+# --- Restore LLM state from a prior snapshot (avoid re-paying) -------------
+with st.expander("Restore LLM state from a snapshot (skip re-running paid calls)"):
+    st.caption("Upload a snapshot.json from a previous run to restore its saved LLM "
+               "judgments, manual overrides and cluster/intent assignments.")
+    snap = st.file_uploader("snapshot.json", type=["json"], key="restore_snap")
+    if snap is not None and st.button("Restore"):
+        try:
+            data = json.load(snap)
+            ss["llm_overrides"].update(data.get("llm_overrides", {}))
+            ss["manual_overrides"].update(data.get("manual_overrides", {}))
+            assigns = data.get("assignments", {})
+            if assigns and ss.get("signals") is not None:
+                sig = ss["signals"]
+                sig["topical_cluster"] = sig.apply(
+                    lambda r: assigns.get(r["url"], {}).get("topical_cluster", r.get("topical_cluster")), axis=1)
+                sig["intent"] = sig.apply(
+                    lambda r: assigns.get(r["url"], {}).get("intent", r.get("intent")), axis=1)
+            rebuild_decisions()
+            st.success(f"Restored {len(data.get('llm_overrides', {}))} LLM judgment(s), "
+                       f"{len(data.get('manual_overrides', {}))} manual override(s), "
+                       f"{len(assigns)} assignment(s).")
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Could not read snapshot: {exc}")
+
 # --- Manual override round-trip -------------------------------------------
 with st.expander("Apply manual overrides (upload an edited Decision Spreadsheet)"):
     st.caption("Edit the `manual_override` column in the Decision Spreadsheet (page 7) to any "
