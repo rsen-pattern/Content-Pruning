@@ -36,6 +36,9 @@ DEFAULTS: dict[str, Any] = {
     "judgment_model": "anthropic/claude-sonnet-4-6",
     "scenario": "balanced",           # conservative | balanced | aggressive
     "preserve_non_organic_as_keep": False,  # NOINDEX vs KEEP for useful-but-unindexed
+    "protect_conversions": True,      # never auto-delete a converting / revenue page
+    "protect_conversions_floor": 1,   # conversions >= this => protected
+    "protect_revenue_floor": 1.0,     # revenue >= this => protected
     "ambiguous_batch_size": 5,
     "max_llm_cost_usd": 5.0,          # hard pre-flight cap
 }

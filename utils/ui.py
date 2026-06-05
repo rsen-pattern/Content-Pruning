@@ -23,6 +23,8 @@ def init_state() -> None:
     ss.setdefault("refresh_suggestions", {})
     ss.setdefault("repurpose_suggestions", {})
     ss.setdefault("llm_overrides", {})  # url -> {action, reason, source, confidence, note}
+    ss.setdefault("manual_overrides", {})  # url -> {...} from an edited Decision Spreadsheet
+    ss.setdefault("availability", None)  # {gsc/ga4/backlinks/frog: bool} from Data Upload
     ss.setdefault("llm_banners", [])
     ss.setdefault("guides_loaded", False)
 

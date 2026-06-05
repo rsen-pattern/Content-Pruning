@@ -65,7 +65,31 @@ if results:
     ss["merged"] = merged
     ss["signals"] = None
     ss["decided"] = None
+    # Which sources are present drives the router's data-availability guards.
+    ss["availability"] = {k: (results.get(k) is not None and results[k].ok)
+                          for k in ("gsc", "ga4", "backlinks", "frog")}
     st.success(f"Merged inventory: **{len(merged)} URLs**.")
+
+    # --- Coverage & join diagnostics --------------------------------------
+    st.subheader("Coverage & join diagnostics")
+    avail = ss["availability"]
+    missing = [k.upper() for k, v in avail.items() if not v]
+    if missing:
+        st.warning(
+            f"Not uploaded: **{', '.join(missing)}**. The audit will *not* infer deletions "
+            "from signals it can't see — affected URLs are escalated for review instead of "
+            "being treated as zero-traffic."
+        )
+    report = loaders.join_report(results, merged)
+    st.dataframe(report, width='stretch')
+    low = report[report["match_rate"].str.rstrip("%").apply(lambda x: x.isdigit() and int(x) < 60)]
+    if not low.empty:
+        st.error(
+            "Low join rate on: " + ", ".join(low["source"]) +
+            ". URLs likely don't match across exports (protocol, www, trailing slash, "
+            "or path-only). Check those exports' URL format."
+        )
+
     st.dataframe(merged.head(50), width='stretch')
 
     # Surface data-derived suggestions for the Configuration page.
