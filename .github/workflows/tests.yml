@@ -26,5 +26,7 @@ jobs:
         run: python -m tests.test_analytical
       - name: Output tests
         run: python -m tests.test_outputs
+      - name: Reference-wiring tests
+        run: python -m tests.test_references
       - name: LLM unit tests
         run: python -m tests.test_llm

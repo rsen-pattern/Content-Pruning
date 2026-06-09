@@ -119,7 +119,24 @@ def route(rec: Any, config, html_urls: Optional[set[str]] = None,
     links_known = avail.get("backlinks", True)  # referring domains / backlinks
 
     decision = _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known)
+    decision = _apply_maturity_guard(decision, rec, config)
     return _apply_guardrails(decision, rec, config, traffic_known)
+
+
+def _apply_maturity_guard(decision: Decision, rec, config) -> Decision:
+    """Don't prune a page that hasn't had time to perform (Ahrefs/Clearscope/
+    AIOSEO/recycle guides). Uses last_modified as a maturity proxy; if it's
+    unknown we can't assess and leave the decision alone."""
+    if decision.action not in (DELETE_301, DELETE_410, NOINDEX):
+        return decision
+    raw = rec.get("days_since_modified") if hasattr(rec, "get") else None
+    if raw is None or pd.isna(raw):
+        return decision
+    if float(raw) < config.get("min_maturity_days", 90):
+        return Decision(AMBIGUOUS, "too-new-to-prune",
+                        note=f"Only {float(raw):.0f} days since last change — too new to prune "
+                             f"confidently (would have been {decision.action}); review.")
+    return decision
 
 
 def _route_core(rec, config, html_urls, clicks_known, traffic_known, links_known) -> Decision:
@@ -272,6 +289,7 @@ def run_router(signals_df: pd.DataFrame, config, availability: Optional[dict] = 
     dec_df = pd.DataFrame([d.as_dict() for d in decisions])
     out = pd.concat([signals_df.reset_index(drop=True), dec_df], axis=1)
     out = assign_redirect_targets(out)
+    out = prefer_redirect_for_deletes(out)
     # Orphan remediation: a valuable page with no internal links in needs them.
     if "is_orphan" in out:
         keeper = out["action"].isin([KEEP, REFRESH, SCHEDULE_UPDATE, CONSOLIDATE])
@@ -295,6 +313,36 @@ def apply_overrides(df: pd.DataFrame, overrides: dict) -> pd.DataFrame:
         for field in ("action", "reason", "source", "confidence", "note", "destination_url"):
             if field in ov and ov[field] is not None:
                 df.loc[m, field] = ov[field]
+    return df
+
+
+def prefer_redirect_for_deletes(df: pd.DataFrame) -> pd.DataFrame:
+    """Per AIOSEO guide: prefer a 301 over a 410 when a close topical match
+    exists. Upgrades a hard-delete (410) to a 301 to the strongest same-cluster
+    keeper, when topical clusters are available. Without clusters, 410 stands
+    ('use 410 when there is no logical redirect target')."""
+    if df.empty or "action" not in df or "topical_cluster" not in df:
+        return df
+    keepers = df[df["action"].isin([KEEP, REFRESH, SCHEDULE_UPDATE])].copy()
+    if keepers.empty:
+        return df
+    keepers["_authority"] = (
+        pd.to_numeric(keepers.get("clicks_12mo", 0), errors="coerce").fillna(0)
+        + pd.to_numeric(keepers.get("referring_domains", 0), errors="coerce").fillna(0)
+    )
+    df = df.copy()
+    for idx in df.index[df["action"] == DELETE_410]:
+        cluster = df.at[idx, "topical_cluster"]
+        if cluster is None or pd.isna(cluster):
+            continue
+        same = keepers[keepers["topical_cluster"] == cluster]
+        if same.empty:
+            continue
+        target = same.sort_values("_authority", ascending=False).iloc[0]["url"]
+        df.at[idx, "action"] = DELETE_301
+        df.at[idx, "destination_url"] = target
+        df.at[idx, "reason"] = "hard-delete-redirected"
+        df.at[idx, "note"] = "No links/traffic, but a close topical match exists — 301 instead of 410."
     return df
 
 
