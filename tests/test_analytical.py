@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 import pandas as pd  # noqa: E402
 
 from utils import router, signals  # noqa: E402
-from utils.config import Config  # noqa: E402
+from utils.config import Config, DEFAULTS  # noqa: E402
 
 
 def _cfg():
@@ -81,6 +81,26 @@ def test_trend_change_pct():
     assert out.loc["https://e.com/down", "clicks_change_pct"] == -0.2
     assert bool(out.loc["https://e.com/down", "is_declining"]) is True
     assert bool(out.loc["https://e.com/up", "is_declining"]) is False
+
+
+def test_export_window_scales_thresholds():
+    cfg = _cfg()
+    window = 6
+    factor = window / 12.0
+    _SCALE_KEYS = ("keep_threshold", "non_organic_threshold", "stale_threshold_days",
+                   "delete_410_age_days")
+    for k in _SCALE_KEYS:
+        cfg.detect(k, max(1, round(DEFAULTS[k] * factor)))
+
+    # Thresholds should be ~half the defaults.
+    assert cfg["keep_threshold"] == round(DEFAULTS["keep_threshold"] * 0.5)
+    assert cfg["stale_threshold_days"] == round(DEFAULTS["stale_threshold_days"] * 0.5)
+    assert cfg.provenance["keep_threshold"] == "detected"
+
+    # User override wins over the detected window scaling.
+    cfg.override("keep_threshold", 999)
+    cfg.detect("keep_threshold", 25)          # re-apply scale — should be ignored
+    assert cfg["keep_threshold"] == 999, "override should survive window rescaling"
 
 
 def main() -> int:

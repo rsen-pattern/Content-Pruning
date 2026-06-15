@@ -27,6 +27,7 @@ def init_state() -> None:
     ss.setdefault("availability", None)  # {gsc/ga4/backlinks/frog: bool} from Data Upload
     ss.setdefault("llm_banners", [])
     ss.setdefault("guides_loaded", False)
+    ss.setdefault("export_window_months", 12)
 
 
 def _fresh_config() -> Config:

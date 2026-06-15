@@ -41,6 +41,15 @@ def threshold(key: str, label: str, *, kind="int", step=1, minv=0.0, maxv=None, 
         cfg.override(key, val)
 
 
+window = st.session_state.get("export_window_months", 12)
+if window != 12:
+    st.info(
+        f"Export window is set to **{window} months** on the Data Upload page. "
+        "Traffic-based thresholds shown below have been scaled accordingly (blue = detected). "
+        "You can still override any value here.",
+        icon="⚡",
+    )
+
 col1, col2 = st.columns(2)
 with col1:
     threshold("keep_threshold", "Keep threshold (clicks/yr)")
