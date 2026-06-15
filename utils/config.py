@@ -47,6 +47,7 @@ DEFAULTS: dict[str, Any] = {
     "trend_decline_pct": -0.2,        # clicks change <= this (e.g. -20%) => declining
     "ambiguous_batch_size": 5,
     "max_llm_cost_usd": 5.0,          # hard pre-flight cap
+    "export_window_months": 12,        # months covered by traffic exports; scales annual thresholds
 }
 
 # Scenario presets shift the *deletion appetite*. Conservative deletes fewer
